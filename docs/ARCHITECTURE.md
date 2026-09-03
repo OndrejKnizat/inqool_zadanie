@@ -4,6 +4,8 @@ Návrh riešenia zadania v `docs/zadanie.md` (originál `docs/zadanie.docx`), vr
 Dokument je návrh na diskusiu, kód sa zatiaľ nepíše. Sekcia [Otvorené otázky](#9-otvorené-otázky) obsahuje
 všetko, čo zadanie nešpecifikuje, s mojím odporúčaním.
 
+**Stav:** všetky odporúčania v sekcii 9 boli odsúhlasené (jediná zmena: O-14, telefónne číslo). Dokument je záväzná špecifikácia pre implementáciu.
+
 Fixné požiadavky (nie sú predmetom diskusie):
 
 | # | Požiadavka |
@@ -460,7 +462,7 @@ Zadanie: „k telefónu sa ukladá vždy rovnaké meno“.
 *Odporúčanie:* meno v požiadavke sa použije **iba pri vytvorení** nového zákazníka; pri existujúcom sa ignoruje a v odpovedi je uložené meno. Zmenu mena rieši `PUT /api/users/{id}`. *Alternatíva:* pri nezhode 400 (prísnejšie, ale „Ján Novák“ vs „Jan Novak“ by padalo).
 
 **O-14 · Formát telefónneho čísla.**
-*Odporúčanie:* validácia regexom E.164 `^\+[1-9][0-9]{7,14}$`, pred uložením odstrániť medzery a pomlčky. Telefón je zároveň login (Basic username). *Alternatíva:* voľný string (jednoduchšie, ale „+420 123“ a „+420123“ budú dvaja zákazníci).
+*Rozhodnuté (po diskusii):* voľnejšia validácia. Pred validáciou aj uložením sa odstránia všetky medzery (a pomlčky), potom sa overí regex `^\+?[0-9]{7,15}$` (plus je voliteľné). Normalizovaná hodnota je zároveň login (Basic username), takže „+420 123 456 789“ a „+420123456789“ sú ten istý zákazník, ale „+420…“ a „420…“ sú dvaja rôzni (žiadne dopĺňanie predvoľby).
 
 **O-15 · Zoradenie a rozsah zoznamov.**
 Zadanie určuje iba „podľa dátumu vytvorenia“ pri filtrovaní podľa kurtu.
