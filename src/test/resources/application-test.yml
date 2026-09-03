@@ -1,4 +1,8 @@
 # Overrides for the "test" profile; everything else is inherited from application.yml.
+# Each Spring test context gets its own in-memory database so contexts cannot pollute each other.
+spring:
+  datasource:
+    url: jdbc:h2:mem:test-${random.uuid};DB_CLOSE_DELAY=-1
 app:
   data-init:
     enabled: false

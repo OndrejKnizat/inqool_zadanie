@@ -31,13 +31,16 @@ public interface GenericDao<T extends BaseEntity> {
      * pass it here. Never build a fresh object with an id and merge it: merge copies every field, so
      * {@code createdAt} would be lost on the returned instance and a soft-deleted row would be silently revived.
      *
+     * The change is flushed before returning, so lifecycle callbacks (audit timestamps, generated id) have
+     * already run on the returned instance.
+     *
      * @return the managed instance (same object for persist, possibly a different one for merge)
      */
     T save(T entity);
 
     /**
      * Soft-deletes the entity: marks it deleted at {@code now} and merges the change.
-     * Idempotent for an already deleted entity.
+     * Idempotent for an already deleted entity. Flushed before returning.
      *
      * @param now deletion time supplied by the caller from the application {@code Clock}
      */

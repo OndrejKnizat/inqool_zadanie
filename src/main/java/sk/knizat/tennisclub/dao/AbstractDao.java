@@ -65,17 +65,22 @@ public abstract class AbstractDao<T extends BaseEntity> implements GenericDao<T>
 
     @Override
     public T save(T entity) {
+        T managed;
         if (entity.getId() == null) {
             em.persist(entity);
-            return entity;
+            managed = entity;
+        } else {
+            managed = em.merge(entity);
         }
-        return em.merge(entity);
+        em.flush();
+        return managed;
     }
 
     @Override
     public void softDelete(T entity, Instant now) {
         entity.markDeleted(now);
         em.merge(entity);
+        em.flush();
     }
 
     @Override

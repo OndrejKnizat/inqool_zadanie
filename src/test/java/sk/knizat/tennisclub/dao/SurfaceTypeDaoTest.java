@@ -6,8 +6,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import sk.knizat.tennisclub.entity.Court;
 import sk.knizat.tennisclub.entity.SurfaceType;
 import sk.knizat.tennisclub.support.Fixtures;
+import sk.knizat.tennisclub.support.MutableClock;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -52,6 +54,29 @@ class SurfaceTypeDaoTest extends AbstractDaoTest {
         assertThat(surfaceTypeDao.findById(saved.getId())).get()
                 .extracting(SurfaceType::getName).isEqualTo("Grass renamed");
         assertThat(surfaceTypeDao.findAll()).hasSize(1);
+    }
+
+    @Test
+    void should_stampUpdatedAtBeforeReturning_when_saveModifiedManagedEntity() {
+        SurfaceType saved = fixtures.persistSurfaceType("Carpet");
+        Instant later = clock.advance(Duration.ofHours(2));
+
+        saved.setName("Carpet renamed");
+        SurfaceType result = surfaceTypeDao.save(saved);
+
+        assertThat(result.getUpdatedAt()).isEqualTo(later);
+        assertThat(result.getCreatedAt()).isEqualTo(MutableClock.DEFAULT_NOW);
+    }
+
+    @Test
+    void should_stampUpdatedAtBeforeReturning_when_softDelete() {
+        SurfaceType saved = fixtures.persistSurfaceType("Carpet");
+        Instant later = clock.advance(Duration.ofHours(2));
+
+        surfaceTypeDao.softDelete(saved, later);
+
+        assertThat(saved.getDeletedAt()).isEqualTo(later);
+        assertThat(saved.getUpdatedAt()).isEqualTo(later);
     }
 
     @Test
