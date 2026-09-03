@@ -17,6 +17,14 @@ H2 in-memory database and Liquibase migrations. Full design: [docs/ARCHITECTURE.
 
 Without the `dev` profile the application requires `APP_JWT_SECRET` to be set (fail-fast, see below).
 
+## Initial data
+
+With `app.data-init.enabled=true` (env `APP_DATA_INIT_ENABLED=true`, or simply the `dev` profile) the application
+seeds two surface types, "Antuka" (2.50/min) and "Umelá tráva" (3.00/min), and four courts: "Court 1" and
+"Court 2" on Antuka, "Court 3" and "Court 4" on Umelá tráva. The seeding goes through the service layer and is
+idempotent: if any court already exists, nothing is created. Otherwise an existing surface type with the same name
+is reused (so a partially completed previous run can finish) and only the missing surface types and the courts are created.
+
 ## Configuration
 
 All `app.*` properties can be overridden with environment variables.
