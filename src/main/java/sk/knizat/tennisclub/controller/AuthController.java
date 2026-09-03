@@ -1,6 +1,9 @@
 package sk.knizat.tennisclub.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -34,12 +37,22 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "Log in with HTTP Basic (phone number + password) and receive tokens",
             security = @SecurityRequirement(name = "basicAuth"))
+    @ApiResponse(responseCode = "200", description = "Tokens issued; the access token is also in the header",
+            headers = @Header(name = HttpHeaders.AUTHORIZATION, description = "Bearer <access token>",
+                    schema = @Schema(type = "string")))
+    @ApiResponse(responseCode = "401", description = "Wrong credentials, unknown phone number or an account "
+            + "without a password (application/problem+json)")
     public ResponseEntity<TokenResponse> login(Principal principal) {
         return withBearerHeader(authService.issueTokens(principal.getName()));
     }
 
     @PostMapping("/refresh")
     @Operation(summary = "Exchange a refresh token for a new token pair", security = {})
+    @ApiResponse(responseCode = "200", description = "New token pair; the access token is also in the header",
+            headers = @Header(name = HttpHeaders.AUTHORIZATION, description = "Bearer <access token>",
+                    schema = @Schema(type = "string")))
+    @ApiResponse(responseCode = "401", description = "Invalid or expired refresh token, or an access token "
+            + "sent instead (application/problem+json)")
     public ResponseEntity<TokenResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
         return withBearerHeader(authService.refresh(request));
     }

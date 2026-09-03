@@ -1,10 +1,12 @@
 # Architektúra – Rezervačný systém tenisového klubu
 
 Návrh riešenia zadania v `docs/zadanie.md` (originál `docs/zadanie.docx`), vrátane všetkých bonusov.
-Dokument je návrh na diskusiu, kód sa zatiaľ nepíše. Sekcia [Otvorené otázky](#9-otvorené-otázky) obsahuje
-všetko, čo zadanie nešpecifikuje, s mojím odporúčaním.
+Sekcia [Otvorené otázky](#9-otvorené-otázky) obsahuje všetko, čo zadanie nešpecifikuje, s odporúčaním, ktoré bolo
+odsúhlasené a implementované.
 
-**Stav:** všetky odporúčania v sekcii 9 boli odsúhlasené (jediná zmena: O-14, telefónne číslo). Dokument je záväzná špecifikácia pre implementáciu.
+**Stav:** dokument vznikol pred písaním kódu ako záväzná špecifikácia; všetky odporúčania v sekcii 9 boli odsúhlasené
+(jediná zmena: O-14, telefónne číslo). Po implementácii bol dokument zosúladený s kódom; miesta, kde sa implementácia
+od pôvodného návrhu odchýlila, sú zhrnuté v sekcii [10. Realizačné odchýlky](#10-realizačné-odchýlky).
 
 Fixné požiadavky (nie sú predmetom diskusie):
 
@@ -99,12 +101,12 @@ classDiagram
 | Atribút | Typ | Poznámka |
 |---------|-----|----------|
 | `id` | `Long`, `@GeneratedValue(IDENTITY)` | |
-| `createdAt` | `Instant` | nastaví `@PrePersist` (nie Spring Data auditing) |
-| `updatedAt` | `Instant` | nastaví `@PreUpdate` |
+| `createdAt` | `Instant` | nastaví `entity.AuditListener` (`@PrePersist`) z injektovaného `Clock` beanu (nie Spring Data auditing) |
+| `updatedAt` | `Instant` | nastaví `entity.AuditListener` (`@PreUpdate`) |
 | `deleted` | `boolean`, default `false` | soft delete flag |
 | `deletedAt` | `Instant`, nullable | čas zmazania |
 
-Metóda `markDeleted()` nastaví `deleted=true` a `deletedAt=now`. `equals/hashCode` podľa `id` (bez Lombok `@Data`; entity budú mať iba `@Getter/@Setter/@NoArgsConstructor`).
+Metóda `markDeleted(Instant now)` nastaví `deleted=true` a `deletedAt=now` (čas dodá service z `Clock` beanu; idempotentná). Audit polia a soft-delete polia nemajú settery. `equals/hashCode` podľa `id` s odbalením Hibernate proxy (`Hibernate.getClass`), `hashCode` stabilný aj pred priradením id (bez Lombok `@Data`; entity majú iba `@Getter/@Setter/@NoArgsConstructor`).
 
 **`SurfaceType`** – číselník povrchov, spravovateľný cez API
 
@@ -151,7 +153,7 @@ Zoradenie „podľa dátumu vytvorenia“ používa `createdAt` z `BaseEntity`.
 
 ### 2.4 Liquibase
 
-`db/changelog/db.changelog-master.yaml` → `001-initial-schema.yaml` (tabuľky `surface_type`, `court`, `app_user`, `reservation`, FK, indexy na `reservation(court_id, start_time, end_time)`, `app_user(phone_number)`, `court(court_number)`). Bez unikátnych constraintov na biznisové kľúče v DB (dôvod: soft delete, viď O-8); unikátnosť rieši service vrstva.
+`db/changelog/db.changelog-master.yaml` → `001-initial-schema.yaml` (tabuľky `surface_type`, `court`, `app_user`, `reservation`, FK, indexy na `reservation(court_id, start_time, end_time)`, `app_user(phone_number)`, `court(court_number)`) a `002-active-unique-keys.yaml`: generované stĺpce `name_active`, `court_number_active`, `phone_number_active` (hodnota kľúča pre nezmazaný riadok, `NULL` pre zmazaný) s unikátnym indexom. Tým DB vynucuje unikátnosť biznisových kľúčov iba medzi nezmazanými riadkami (O-8); service kontroluje duplicitu vopred (409) a kolíziu z DB prekladá na 409 (`UniqueKeys.saveOrConflict`).
 
 ---
 
@@ -180,8 +182,8 @@ HTTP ──► controller ──► service ──► dao ──► EntityManage
 public interface GenericDao<T extends BaseEntity> {
     Optional<T> findById(Long id);      // iba nezmazané
     List<T> findAll();                  // iba nezmazané
-    T save(T entity);                   // persist (id == null) / merge
-    void softDelete(T entity);          // markDeleted() + merge
+    T save(T entity);                   // persist (id == null) / merge, potom flush (audit časy v odpovedi)
+    void softDelete(T entity, Instant now); // markDeleted(now) + merge + flush
     boolean existsById(Long id);
 }
 
@@ -197,11 +199,11 @@ Konkrétne DAO (`CourtDao`, `SurfaceTypeDao`, `UserDao`, `ReservationDao`) rozš
 | DAO | Špecifické metódy |
 |-----|-------------------|
 | `SurfaceTypeDao` | `findByName`, `countCourtsUsing(surfaceTypeId)` |
-| `CourtDao` | `findByCourtNumber`, `existsByCourtNumber` |
-| `UserDao` | `findByPhoneNumber` |
-| `ReservationDao` | `findByCourtNumberOrderByCreatedAt`, `findByPhoneNumber(phone, futureOnly)`, `existsOverlapping(courtId, start, end, excludeId)`, `existsFutureByCourt`, `existsFutureByUser` |
+| `CourtDao` | `findByCourtNumber`, `existsByCourtNumber`, `findByIdForUpdate` (PESSIMISTIC_WRITE), `findAll` s `JOIN FETCH` povrchu |
+| `UserDao` | `findByPhoneNumber`, `countActiveAdmins` |
+| `ReservationDao` | `findByCourtNumberOrderByCreatedAt`, `findByPhoneNumber(phone, futureOnly, now)`, `findAllOrderByStartTime`, `existsOverlapping(courtId, start, end, excludeId)`, `existsUnfinishedByCourt(courtId, now)`, `existsUnfinishedByUser(userId, now)` (`endTime > now`, blokuje aj prebiehajúcu rezerváciu) |
 
-Súbežnosť pri vzniku rezervácie: service pred kontrolou prekrývania zamkne riadok kurtu (`em.lock(court, PESSIMISTIC_WRITE)`), takže dve súbežné rezervácie na ten istý kurt sa serializujú (viď O-7).
+Súbežnosť pri vzniku rezervácie: service pred kontrolou prekrývania zamkne riadok kurtu cez `CourtDao.findByIdForUpdate` (`PESSIMISTIC_WRITE`, `EntityManager` ostáva v DAO), takže dve súbežné rezervácie na ten istý kurt sa serializujú (viď O-7); vypršanie zámku sa prekladá na 409.
 
 ### 3.2 Spracovanie chýb
 
@@ -212,7 +214,7 @@ Súbežnosť pri vzniku rezervácie: service pred kontrolou prekrývania zamkne 
 | Bean Validation, nečitateľný JSON, zlý typ parametra | 400 | `MethodArgumentNotValidException`, … |
 | Biznisová validácia (interval, prekrývanie, zmazaný povrch, …) | 400 | `ValidationException` (vlastná) |
 | Entita neexistuje / je zmazaná | 404 | `NotFoundException` |
-| Konflikt stavu (mazanie povrchu s kurtami, kurtu s budúcimi rezerváciami, duplicitné číslo kurtu) | 409 | `ConflictException` |
+| Konflikt stavu (mazanie povrchu s kurtami, kurtu alebo užívateľa s nedokončenými rezerváciami, duplicitný kľúč, posledný admin, vypršanie zámku kurtu) | 409 | `ConflictException` |
 | Chýbajúci / neplatný / expirovaný token | 401 | `AuthenticationEntryPoint` |
 | Nedostatočná rola | 403 | `AccessDeniedHandler` |
 
@@ -225,46 +227,53 @@ Prekrývanie rezervácie → **400** (zadanie explicitne uvádza „nevalidná r
 Rozdelenie podľa vrstiev (jednoduché vynútenie ArchUnitom):
 
 ```
-sk.knizat.tennisclub                      (groupId viď O-20)
+sk.knizat.tennisclub
 ├── TennisClubApplication.java
 ├── config/
-│   ├── AppProperties.java                @ConfigurationProperties("app") – dataInit, security.jwt, security.admin
-│   ├── SecurityConfig.java
-│   ├── JwtConfig.java                    NimbusJwtEncoder/Decoder z HS256 secretu
-│   ├── OpenApiConfig.java
-│   └── DataInitializer.java              ApplicationRunner, aktívny pri app.data-init.enabled=true
+│   ├── AppProperties.java                @ConfigurationProperties("app") – dataInit, security.jwt, security.admin, reservation
+│   ├── ClockConfig.java                  Clock bean (systemUTC)
+│   ├── SecurityConfig.java               dva filter chainy (Basic login, JWT resource server), role matrix
+│   ├── JwtConfig.java                    NimbusJwtEncoder/Decoder z HS256 secretu, validátory (iss, exp podľa Clock)
+│   ├── PasswordConfig.java               BCryptPasswordEncoder
+│   ├── OpenApiConfig.java                springdoc: popis API, schémy bearerAuth/basicAuth
+│   ├── DataInitializer.java              ApplicationRunner, aktívny pri app.data-init.enabled=true
+│   └── AdminInitializer.java             ApplicationRunner, bootstrap ADMIN účtu (O-3)
 ├── controller/
-│   ├── AuthController.java               /api/auth/**
+│   ├── AuthController.java               /api/auth/login, /api/auth/refresh
 │   ├── SurfaceTypeController.java        /api/surface-types
 │   ├── CourtController.java              /api/courts
 │   ├── ReservationController.java        /api/reservations
-│   ├── UserController.java               /api/users
-│   └── GlobalExceptionHandler.java
+│   ├── UserController.java               /api/users, /api/users/me
+│   └── GlobalExceptionHandler.java       ResponseEntityExceptionHandler + vlastné výnimky → ProblemDetail
 ├── dto/
+│   ├── GameTypeDto, RoleDto              API enumy (entity enumy nikdy v API)
 │   ├── surfacetype/  SurfaceTypeRequest, SurfaceTypeResponse
 │   ├── court/        CourtRequest, CourtResponse
-│   ├── reservation/  CreateReservationRequest, UpdateReservationRequest, ReservationResponse
-│   ├── user/         CreateUserRequest, UpdateUserRequest, UserResponse
-│   └── auth/         LoginResponse, RefreshTokenRequest
+│   ├── reservation/  CreateReservationRequest, UpdateReservationRequest, ReservationResponse, CustomerResponse
+│   ├── user/         CreateUserRequest, UpdateUserRequest, UserResponse, AuthUser (interný, s hashom, nikdy v odpovedi)
+│   ├── auth/         TokenResponse, RefreshTokenRequest
+│   └── validation/   PhoneNumber (constraint), PhoneNumberValidator, PhoneNumbers (normalizácia)
 ├── mapper/
-│   ├── SurfaceTypeMapper, CourtMapper, ReservationMapper, UserMapper
+│   └── SurfaceTypeMapper, CourtMapper, ReservationMapper, UserMapper
 ├── service/
 │   ├── SurfaceTypeService, CourtService, ReservationService, UserService, AuthService  (interfaces)
-│   ├── impl/         …ServiceImpl
-│   └── PriceCalculator.java              čistá funkcia, ľahko testovateľná
+│   ├── PriceCalculator.java              čistá funkcia, ľahko testovateľná
+│   └── impl/         …ServiceImpl, UniqueKeys (DB kolízia unikátneho kľúča → 409)
 ├── dao/
-│   ├── GenericDao, AbstractDao
+│   ├── GenericDao, AbstractDao           EntityManager cez @PersistenceContext, JPQL s deleted = false
 │   ├── SurfaceTypeDao, CourtDao, UserDao, ReservationDao      (interfaces)
 │   └── impl/         …DaoImpl extends AbstractDao
 ├── entity/
-│   ├── BaseEntity, SurfaceType, Court, User, Reservation, Role, GameType
+│   ├── BaseEntity, AuditListener, SurfaceType, Court, User, Reservation, Role, GameType
 ├── exception/
-│   ├── NotFoundException, ValidationException, ConflictException
+│   └── NotFoundException, ValidationException, ConflictException, UnauthorizedException
 └── security/
-    ├── JwtTokenService.java              vydanie access/refresh tokenu, claims (sub=phone, role, typ)
-    ├── JwtAuthenticationFilter.java      alebo BearerTokenAuthenticationFilter z resource-server
-    ├── AppUserDetailsService.java
-    └── RestAuthenticationEntryPoint / RestAccessDeniedHandler
+    ├── JwtTokenService.java              vydanie access/refresh tokenu (claims sub=phone, role, type), dekódovanie refresh tokenu
+    ├── TokenPair.java
+    ├── AccessTokenAuthenticationConverter.java   bearer JWT → Authentication, iba type=access, role → ROLE_*
+    ├── AppUserDetails, AppUserDetailsService     adaptér nad AuthUser (cez UserService)
+    ├── RestAuthenticationEntryPoint / RestAccessDeniedHandler   401 / 403 ako ProblemDetail
+    └── ProblemResponses.java             zápis ProblemDetail z filtrov
 ```
 
 Testy zrkadlia štruktúru v `src/test/java`, navyše `architecture/ArchitectureTest.java`.
@@ -300,18 +309,18 @@ Všetko pod `/api`. Rola: `USER` = čítanie + vznik rezervácie; `ADMIN` = vše
 |--------|-------|------|--------|----------|
 | GET | `/api/courts` | USER | 200 | |
 | GET | `/api/courts/{id}` | USER | 200 / 404 | |
-| POST | `/api/courts` | ADMIN | 201 + `Location` | body `{courtNumber, name?, surfaceTypeId}`; 409 duplicitné číslo |
+| POST | `/api/courts` | ADMIN | 201 + `Location` | body `{courtNumber, name?, surfaceTypeId}`; 409 duplicitné číslo; 400 neexistujúci/zmazaný `surfaceTypeId` (id je súčasť payloadu, nie cesty) |
 | PUT | `/api/courts/{id}` | ADMIN | 200 | |
-| DELETE | `/api/courts/{id}` | ADMIN | 204 | 409 ak má budúce nezmazané rezervácie (viď O-9) |
+| DELETE | `/api/courts/{id}` | ADMIN | 204 | 409 ak má nedokončené (aj prebiehajúce) nezmazané rezervácie (viď O-9) |
 
 ### 5.4 Rezervácie (`/api/reservations`) – RUD + vznik
 
 | Metóda | Cesta | Rola | Status | Poznámka |
 |--------|-------|------|--------|----------|
-| POST | `/api/reservations` | USER | 201 + `Location` | body `{courtNumber, startTime, endTime, gameType, phoneNumber, customerName}`; response `ReservationResponse` vrátane `price`; 400 pri nevalidnom intervale alebo prekrývaní; 404 kurt |
+| POST | `/api/reservations` | USER | 201 + `Location` | body `{courtNumber, startTime, endTime, gameType, phoneNumber, customerName}`; response `ReservationResponse` vrátane `price`; 400 pri nevalidnom intervale alebo prekrývaní; 404 neznáme číslo kurtu; 409 pri vypršaní zámku kurtu (možno zopakovať) |
 | GET | `/api/reservations` | USER | 200 | filtre: `courtNumber` (zoradené podľa `createdAt` ASC), `phoneNumber` + `futureOnly=true|false` (zoradené podľa `startTime` ASC). Bez filtra vráti všetky (zoradené podľa `startTime`). Filtre sú kombinovateľné. |
 | GET | `/api/reservations/{id}` | USER | 200 / 404 | |
-| PUT | `/api/reservations/{id}` | ADMIN | 200 | body `{courtNumber, startTime, endTime, gameType}`; prepočíta cenu, re-validuje prekrývanie (bez seba); zákazník sa nemení (viď O-12) |
+| PUT | `/api/reservations/{id}` | ADMIN | 200 | body `{courtNumber, startTime, endTime, gameType}`; prepočíta cenu, re-validuje interval (aj „nie do minulosti“, takže už začatú rezerváciu nemožno upraviť) a prekrývanie (bez seba); zákazník sa nemení (viď O-12) |
 | DELETE | `/api/reservations/{id}` | ADMIN | 204 | |
 
 `ReservationResponse`: `{id, courtNumber, courtName, startTime, endTime, gameType, price, customer: {phoneNumber, name}, createdAt}`.
@@ -325,16 +334,16 @@ Všetko pod `/api`. Rola: `USER` = čítanie + vznik rezervácie; `ADMIN` = vše
 | GET | `/api/users/me` | USER | 200 | prihlásený užívateľ |
 | POST | `/api/users` | ADMIN | 201 | `{phoneNumber, name, password, role}`; 409 duplicitný telefón |
 | PUT | `/api/users/{id}` | ADMIN | 200 | `{name, role, password?}` |
-| DELETE | `/api/users/{id}` | ADMIN | 204 | 409 ak má budúce rezervácie; nemožno zmazať seba |
+| DELETE | `/api/users/{id}` | ADMIN | 204 | 409 ak má nedokončené rezervácie; nemožno zmazať seba ani posledného administrátora (rovnako ho nemožno degradovať cez PUT) |
 
 `UserResponse` nikdy neobsahuje `passwordHash`.
 
 ### 5.6 Security matrix (HTTP matcher v `SecurityConfig`)
 
 ```
-permitAll:   /api/auth/**, /swagger-ui/**, /v3/api-docs/**, /h2-console/** (iba dev profil)
-USER|ADMIN:  GET /api/**, POST /api/reservations, GET /api/users/me
-ADMIN:       všetko ostatné pod /api/** (POST/PUT/DELETE, /api/users/**)
+permitAll:   /api/auth/**, /swagger-ui/**, /swagger-ui.html, /v3/api-docs/**, /h2-console/** (iba keď je H2 konzola zapnutá = dev profil)
+USER|ADMIN:  GET/HEAD /api/users/me, GET/HEAD /api/** (okrem /api/users/**), POST /api/reservations
+ADMIN:       všetko ostatné pod /api/** (POST/PUT/DELETE, celé /api/users/**)
 ```
 
 Stateless session, CSRF vypnuté, Basic auth povolená len na `/api/auth/login`, Bearer JWT všade inde.
@@ -357,9 +366,14 @@ app:
       phone-number: "+420000000000"
       name: Administrator
       password: ${APP_ADMIN_PASSWORD:admin}
+  reservation:
+    min-duration: PT15M           # O-5
+    max-duration: PT4H
 ```
 
-Všetko prepísateľné env premennými (`APP_DATA_INIT_ENABLED=true`, …). Profily: `default` (dev, H2 konzola, data-init `true` v `application-dev.yml`), `test`.
+Všetko prepísateľné env premennými (`APP_DATA_INIT_ENABLED=true`, …). Profily: *default* (produkčný: vyžaduje
+`APP_JWT_SECRET`, data-init vypnutý, H2 konzola vypnutá), `dev` (`application-dev.yml`: vstavaný dev secret, data-init
+zapnutý, H2 konzola), `test` (`src/test/resources/application-test.yml`).
 
 Inicializácia dát (`DataInitializer`, `ApplicationRunner`): ak `app.data-init.enabled=true`, idempotentne vytvorí povrchy „Antuka“ (napr. 2,50/min) a „Umelá tráva“ (3,00/min) a kurty 1–4 (2× antuka, 2× tráva). Ak už existujú kurty, nič nerobí.
 
@@ -441,7 +455,7 @@ Dve paralelné požiadavky prejdú kontrolou prekrývania a obe sa uložia.
 
 **O-8 · Unikátnosť biznisových kľúčov (číslo kurtu, názov povrchu, telefón) vs. soft delete.**
 DB `UNIQUE` constraint by bránil znovu vytvoriť kurt č. 3 po jeho soft delete.
-*Odporúčanie:* unikátnosť iba medzi nezmazanými záznamami, kontrolovaná v service cez DAO (`existsByCourtNumber` a pod.) → 409. V DB len obyčajný index. Po soft delete zákazníka a novej rezervácii na rovnaký telefón vznikne nový `User` (starý ostáva zmazaný s históriou).
+*Odporúčanie:* unikátnosť iba medzi nezmazanými záznamami, kontrolovaná v service cez DAO (`existsByCourtNumber` a pod.) → 409. Po soft delete zákazníka a novej rezervácii na rovnaký telefón vznikne nový `User` (starý ostáva zmazaný s históriou). *Realizácia:* revízia kroku 5 ukázala, že samotná kontrola v service nestačí (dve súbežné prvé rezervácie s rovnakým novým telefónom by vytvorili dvoch zákazníkov a natrvalo rozbili vyhľadávanie podľa telefónu), preto DB navyše vynucuje unikátnosť aktívnych riadkov cez generované stĺpce `*_active` + unikátny index (viď §2.4).
 
 **O-9 · Kaskáda soft delete.**
 Čo s rezerváciami pri zmazaní kurtu / užívateľa, s kurtami pri zmazaní povrchu?
@@ -507,3 +521,31 @@ Nie je v zadaní.
 ### C. Zhrnutie – čo potrebujem od teba
 
 Stačí prejsť zoznam a napísať čísla otázok, kde nesúhlasíš s odporúčaním. Kľúčové pre začiatok kódovania sú **O-1, O-2, O-3, O-4, O-5, O-10, O-11, O-20**; ostatné sa dajú zmeniť aj neskôr s malým dopadom.
+
+---
+
+## 10. Realizačné odchýlky
+
+Zhrnutie miest, kde sa implementácia odchýlila od pôvodného návrhu (dôvod bol vždy nález nezávislej revízie alebo
+pravidlo z `CLAUDE.md`); sekcie vyššie sú už zosúladené.
+
+| Oblasť | Pôvodný návrh | Realizácia | Dôvod |
+|--------|---------------|------------|-------|
+| Audit časy | `@PrePersist/@PreUpdate` v `BaseEntity` s `Instant.now()` | `entity.AuditListener` s injektovaným `Clock` | pravidlo „nikdy `Instant.now()`“, deterministické testy |
+| Soft delete | `markDeleted()`, `softDelete(entity)` | `markDeleted(Instant now)`, `softDelete(entity, now)` | čas iba z `Clock` v service |
+| DAO `save` | persist/merge | persist/merge + `flush` | inak PUT odpoveď niesla staré `updatedAt` |
+| Unikátnosť kľúčov | iba service | service + DB (generované stĺpce `*_active`, changelog 002), kolízia → 409 | súbežné vytvorenie zákazníka (O-8) |
+| Blokovanie mazania | `existsFutureBy*` (`startTime > now`) | `existsUnfinishedBy*` (`endTime > now`) | prebiehajúca rezervácia musí blokovať mazanie kurtu/užívateľa |
+| Chybové odpovede | ručný `@RestControllerAdvice` | `ResponseEntityExceptionHandler` + vlastné handlery | aj 405/415/404 neznámej cesty ako `application/problem+json` |
+| Zámok kurtu | `em.lock` | `CourtDao.findByIdForUpdate` (`PESSIMISTIC_WRITE`), timeout → 409 v service | ArchUnit nepustí `org.springframework.dao` do controllera |
+| API enumy | `GameType`, `Role` z `entity` | `dto.GameTypeDto`, `dto.RoleDto` | entita/entity enum nikdy v API |
+| Telefón | dvojstupňová validácia | `@PhoneNumber` constraint + `PhoneNumbers.normalise` (balík `dto.validation`) | jednotný tvar chýb v `errors` |
+| Kurt: neznámy `surfaceTypeId` | 404 | 400 | id je súčasť payloadu, nie adresovaný zdroj |
+| Rezervácia: neznáme číslo kurtu | 404 | 404 s textom „Court with number N not found“ | číslo kurtu je biznisový identifikátor |
+| Update rezervácie | re-validácia prekrývania | plná validácia intervalu, vrátane „nie do minulosti“ | rovnaké pravidlá ako pri vzniku; už začatú rezerváciu nemožno upraviť |
+| `futureOnly` | v JPQL | v JPQL pre filter podľa telefónu, inak v pamäti | malé dáta, menej DAO variantov |
+| Užívatelia | – | posledného ADMINa nemožno zmazať ani degradovať; zmena roly sa v už vydanom tokene prejaví až po expirácii | ochrana pred zamknutím systému |
+| Login | 401 s rozlíšením „účet bez hesla“ | jednotné „Invalid credentials“ | zamedzenie enumerácie telefónnych čísel |
+| Testovacia DB | zdieľaná `jdbc:h2:mem:tennis` | `jdbc:h2:mem:test-${random.uuid}` per Spring kontext + čistenie po e2e testoch | nezávislosť od poradia testov |
+| Triedy nad rámec pôvodného stromu v §4 (strom je už aktualizovaný) | – | `entity.AuditListener`, `dto.validation.*`, `dto.user.AuthUser`, `exception.UnauthorizedException`, `service.impl.UniqueKeys`, `security.{AccessTokenAuthenticationConverter, AppUserDetails, TokenPair, ProblemResponses}`, `config.{ClockConfig, PasswordConfig, AdminInitializer}` | potreby krokov 1, 5, 7 |
+

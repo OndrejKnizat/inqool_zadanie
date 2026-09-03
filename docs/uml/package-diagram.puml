@@ -1,0 +1,47 @@
+@startuml package-diagram
+!pragma layout smetana
+title Package and layer dependencies (enforced by ArchUnit)
+skinparam packageStyle rectangle
+
+package "sk.knizat.tennisclub" {
+  [controller] as controller
+  [dto] as dto
+  [service] as service
+  [mapper] as mapper
+  [dao] as dao
+  [entity] as entity
+  [security] as security
+  [config] as config
+  [exception] as exception
+}
+cloud "HTTP client" as client
+database "H2 (Liquibase schema)" as db
+
+client --> security : Bearer JWT / Basic login
+security --> controller
+controller --> service
+controller --> dto
+service --> dao
+service --> mapper
+service --> dto
+mapper --> entity
+mapper --> dto
+dao --> entity
+dao --> db : EntityManager + JPQL
+security --> service : UserService
+config --> service : DataInitializer, AdminInitializer
+controller ..> exception
+service ..> exception
+
+note bottom of controller
+  never references entity or dao
+  (ArchUnit rule)
+end note
+note bottom of dao
+  only place with EntityManager;
+  every query filters deleted = false
+end note
+note right of service
+  only place with @Transactional
+end note
+@enduml

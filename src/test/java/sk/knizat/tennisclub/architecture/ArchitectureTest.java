@@ -85,6 +85,12 @@ class ArchitectureTest {
             .should().dependOnClassesThat().areAssignableTo(EntityManager.class)
             .allowEmptyShould(true);
 
+    /** Soft delete only: nothing in production code may call EntityManager.remove. */
+    @ArchTest
+    static final ArchRule entity_manager_remove_is_never_called = noClasses()
+            .should().callMethod(EntityManager.class, "remove", Object.class)
+            .because("all deletions are soft deletes (BaseEntity.markDeleted)");
+
     /** Rule 6a: every *DaoImpl extends AbstractDao. */
     @ArchTest
     static final ArchRule dao_impls_extend_abstract_dao = classes()

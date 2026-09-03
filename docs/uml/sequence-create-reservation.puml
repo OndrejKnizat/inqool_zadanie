@@ -1,0 +1,42 @@
+@startuml sequence-create-reservation
+title Create reservation - POST /api/reservations
+autonumber
+actor Client
+participant "Security filter\n(JWT)" as Sec
+participant ReservationController as C
+participant ReservationServiceImpl as S
+participant CourtDao as CD
+participant ReservationDao as RD
+participant UserDao as UD
+participant PriceCalculator as P
+database H2
+
+Client -> Sec : POST /api/reservations\nAuthorization: Bearer <access>
+Sec -> Sec : validate token, role USER|ADMIN
+Sec -> C : CreateReservationRequest (@Valid)
+C -> S : create(request)
+activate S
+S -> S : validateInterval(start, end)\n(whole minutes, start < end,\nnot in past, min/max duration)
+S -> CD : findByCourtNumber(courtNumber)
+CD -> H2 : SELECT ... WHERE deleted = false
+S -> CD : findByIdForUpdate(courtId)
+CD -> H2 : SELECT ... FOR UPDATE (PESSIMISTIC_WRITE)
+S -> RD : existsOverlapping(courtId, start, end, null)
+RD -> H2 : COUNT(r) WHERE r.start < :end AND r.end > :start\nAND r.deleted = false
+alt overlap
+  S --> C : ValidationException
+  C --> Client : 400 ProblemDetail
+end
+S -> UD : findByPhoneNumber(normalised phone)
+alt customer unknown
+  S -> UD : save(new User(phone, name, USER))
+  UD -> H2 : INSERT app_user
+end
+S -> P : calculate(start, end, pricePerMinute, gameType)
+P --> S : price (minutes x price x 1.5 for doubles)
+S -> RD : save(reservation)
+RD -> H2 : INSERT reservation (price snapshot)
+S --> C : ReservationResponse
+deactivate S
+C --> Client : 201 Created, Location, body with price
+@enduml

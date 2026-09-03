@@ -13,6 +13,9 @@ class OpenApiConfigTest {
         OpenAPI openAPI = new OpenApiConfig().openAPI();
 
         assertThat(openAPI.getInfo().getTitle()).isEqualTo("Tennis Club Reservations API");
+        assertThat(openAPI.getInfo().getDescription())
+                .isEqualTo(OpenApiConfig.DESCRIPTION)
+                .contains("/api/auth/login", "ISO-8601", "1.5 for doubles");
         SecurityScheme bearer = openAPI.getComponents().getSecuritySchemes().get(OpenApiConfig.BEARER_AUTH);
         assertThat(bearer.getType()).isEqualTo(SecurityScheme.Type.HTTP);
         assertThat(bearer.getScheme()).isEqualTo("bearer");

@@ -1,6 +1,7 @@
 package sk.knizat.tennisclub.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -46,18 +47,23 @@ public class UserController {
 
     @GetMapping("/me")
     @Operation(summary = "Get the account of the current user")
+    @ApiResponse(responseCode = "404", description = "The account was deleted after the token was issued")
     public UserResponse me(Principal principal) {
         return userService.findByPhoneNumber(principal.getName());
     }
 
     @GetMapping("/{id}")
     @Operation(summary = "Get a user by id (ADMIN)")
+    @ApiResponse(responseCode = "404", description = "User not found or deleted")
     public UserResponse findById(@PathVariable Long id) {
         return userService.findById(id);
     }
 
     @PostMapping
     @Operation(summary = "Create a user account (ADMIN)")
+    @ApiResponse(responseCode = "201", description = "User created")
+    @ApiResponse(responseCode = "400", description = "Invalid payload (phone number, password length, role)")
+    @ApiResponse(responseCode = "409", description = "Phone number already registered")
     public ResponseEntity<UserResponse> create(@Valid @RequestBody CreateUserRequest request) {
         UserResponse created = userService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -69,6 +75,8 @@ public class UserController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Update name, role and optionally password of a user (ADMIN)")
+    @ApiResponse(responseCode = "200", description = "User updated")
+    @ApiResponse(responseCode = "409", description = "Demoting the last administrator")
     public UserResponse update(@PathVariable Long id, @Valid @RequestBody UpdateUserRequest request) {
         return userService.update(id, request);
     }
@@ -76,6 +84,9 @@ public class UserController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Soft-delete a user (ADMIN); not yourself, not with unfinished reservations")
+    @ApiResponse(responseCode = "204", description = "User deleted")
+    @ApiResponse(responseCode = "409", description = "Own account, the last administrator, or a user with "
+            + "unfinished reservations")
     public void delete(@PathVariable Long id, Principal principal) {
         userService.delete(id, principal.getName());
     }

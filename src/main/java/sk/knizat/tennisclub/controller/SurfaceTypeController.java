@@ -1,6 +1,7 @@
 package sk.knizat.tennisclub.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -40,12 +41,16 @@ public class SurfaceTypeController {
 
     @GetMapping("/{id}")
     @Operation(summary = "Get a surface type by id")
+    @ApiResponse(responseCode = "404", description = "Surface type not found or deleted")
     public SurfaceTypeResponse findById(@PathVariable Long id) {
         return surfaceTypeService.findById(id);
     }
 
     @PostMapping
     @Operation(summary = "Create a surface type")
+    @ApiResponse(responseCode = "201", description = "Surface type created")
+    @ApiResponse(responseCode = "400", description = "Invalid payload")
+    @ApiResponse(responseCode = "409", description = "Name already used by a non-deleted surface type")
     public ResponseEntity<SurfaceTypeResponse> create(@Valid @RequestBody SurfaceTypeRequest request) {
         SurfaceTypeResponse created = surfaceTypeService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
@@ -56,7 +61,10 @@ public class SurfaceTypeController {
     }
 
     @PutMapping("/{id}")
-    @Operation(summary = "Update a surface type")
+    @Operation(summary = "Update a surface type",
+            description = "A price change does not affect existing reservations (price snapshot).")
+    @ApiResponse(responseCode = "200", description = "Surface type updated")
+    @ApiResponse(responseCode = "409", description = "Name already used by another surface type")
     public SurfaceTypeResponse update(@PathVariable Long id, @Valid @RequestBody SurfaceTypeRequest request) {
         return surfaceTypeService.update(id, request);
     }
@@ -64,6 +72,8 @@ public class SurfaceTypeController {
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Soft-delete a surface type")
+    @ApiResponse(responseCode = "204", description = "Surface type deleted")
+    @ApiResponse(responseCode = "409", description = "Surface type is still used by a non-deleted court")
     public void delete(@PathVariable Long id) {
         surfaceTypeService.delete(id);
     }
