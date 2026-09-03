@@ -2,7 +2,7 @@
 # Each Spring test context gets its own in-memory database so contexts cannot pollute each other.
 spring:
   datasource:
-    url: jdbc:h2:mem:test-${random.uuid};DB_CLOSE_DELAY=-1
+    url: jdbc:h2:mem:test-${random.uuid};DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000
 app:
   data-init:
     enabled: false

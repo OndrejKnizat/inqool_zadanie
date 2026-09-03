@@ -39,6 +39,9 @@ Java 21, Spring Boot 3.5.x, Maven (`./mvnw`), Hibernate 6 (cez `spring-boot-star
   Soft delete iba cez `markDeleted(clock.instant())`. H2 ukladá časy s mikrosekundovou presnosťou, preto v testoch
   používaj `Clock.fixed(...)` s celými sekundami a neporovnávaj `Instant.now()` na rovnosť.
 - Entita `User` koliduje menom so Spring Security `User`; adaptér pre security pomenuj `AppUserDetails`, entitu nepremenúvaj.
+- Unikátnosť biznisových kľúčov (názov povrchu, číslo kurtu, telefón) medzi nezmazanými riadkami vynucuje DB cez
+  generované stĺpce `*_active` + unikátny index (changelog 002). Service kontroluje duplicitu vopred (409) a kolíziu
+  z DB (`DataIntegrityViolationException`) prekladá na 409 cez `service.impl.UniqueKeys.saveOrConflict`.
 - Peniaze: `BigDecimal`, scale 2, `HALF_UP`.
 - Telefónne číslo: pred validáciou aj uložením odstrániť medzery a pomlčky, potom regex `^\+?[0-9]{7,15}$`.
 - Konfigurácia: prefix `app.*` cez `@ConfigurationProperties` record `AppProperties` (viď ARCHITECTURE.md §6).

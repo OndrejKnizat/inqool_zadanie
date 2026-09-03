@@ -2,6 +2,7 @@ package sk.knizat.tennisclub.dao;
 
 import org.hibernate.Hibernate;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import sk.knizat.tennisclub.entity.Court;
 import sk.knizat.tennisclub.entity.SurfaceType;
@@ -11,6 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Integration tests of {@link CourtDao}. */
 class CourtDaoTest extends AbstractDaoTest {
@@ -116,5 +118,14 @@ class CourtDaoTest extends AbstractDaoTest {
 
         assertThat(courts).extracting(Court::getCourtNumber).containsExactly(1, 2);
         assertThat(courts).allSatisfy(court -> assertThat(Hibernate.isInitialized(court.getSurfaceType())).isTrue());
+    }
+
+    @Test
+    void should_rejectSecondActiveCourt_when_numberAlreadyUsed() {
+        SurfaceType clay = fixtures.persistSurfaceType("Clay");
+        courtDao.save(Fixtures.court(5, clay));
+
+        assertThatThrownBy(() -> courtDao.save(Fixtures.court(5, clay)))
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
 }

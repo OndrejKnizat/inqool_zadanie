@@ -1,12 +1,14 @@
 package sk.knizat.tennisclub.dao;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import sk.knizat.tennisclub.entity.Role;
 import sk.knizat.tennisclub.entity.User;
 import sk.knizat.tennisclub.support.Fixtures;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Integration tests of {@link UserDao}. */
 class UserDaoTest extends AbstractDaoTest {
@@ -48,5 +50,22 @@ class UserDaoTest extends AbstractDaoTest {
 
         assertThat(userDao.findAll()).extracting(User::getId).containsExactly(saved.getId());
         assertThat(userDao.existsById(saved.getId())).isTrue();
+    }
+
+    @Test
+    void should_rejectSecondActiveUser_when_phoneAlreadyUsed() {
+        userDao.save(Fixtures.user("+421900000777", "First"));
+
+        assertThatThrownBy(() -> userDao.save(Fixtures.user("+421900000777", "Second")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void should_allowSamePhone_when_previousUserIsSoftDeleted() {
+        fixtures.persistDeleted(Fixtures.user("+421900000778", "Old"));
+
+        User again = userDao.save(Fixtures.user("+421900000778", "New"));
+
+        assertThat(userDao.findByPhoneNumber("+421900000778")).get().isEqualTo(again);
     }
 }

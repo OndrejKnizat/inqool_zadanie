@@ -1,0 +1,39 @@
+databaseChangeLog:
+  # Business keys are unique only among non-deleted rows (ARCHITECTURE.md O-8). A plain UNIQUE constraint
+  # would block reusing a key after a soft delete, so each table gets a generated column that mirrors the key
+  # while the row is active and is NULL once deleted; NULLs are distinct in H2 unique indexes, so the index
+  # enforces uniqueness for active rows only. The columns are not mapped by JPA (Hibernate validate ignores
+  # extra columns) and are maintained by the database.
+  - changeSet:
+      id: 002-1-surface_type-name-active
+      author: tennisclub
+      dbms: h2
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE surface_type ADD COLUMN name_active VARCHAR(100)
+              GENERATED ALWAYS AS (CASE WHEN deleted THEN NULL ELSE name END)
+        - sql:
+            sql: CREATE UNIQUE INDEX ux_surface_type_name_active ON surface_type (name_active)
+  - changeSet:
+      id: 002-2-court-number-active
+      author: tennisclub
+      dbms: h2
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE court ADD COLUMN court_number_active INT
+              GENERATED ALWAYS AS (CASE WHEN deleted THEN NULL ELSE court_number END)
+        - sql:
+            sql: CREATE UNIQUE INDEX ux_court_number_active ON court (court_number_active)
+  - changeSet:
+      id: 002-3-app_user-phone-active
+      author: tennisclub
+      dbms: h2
+      changes:
+        - sql:
+            sql: >-
+              ALTER TABLE app_user ADD COLUMN phone_number_active VARCHAR(20)
+              GENERATED ALWAYS AS (CASE WHEN deleted THEN NULL ELSE phone_number END)
+        - sql:
+            sql: CREATE UNIQUE INDEX ux_app_user_phone_active ON app_user (phone_number_active)

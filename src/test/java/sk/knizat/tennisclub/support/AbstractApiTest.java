@@ -35,9 +35,6 @@ public abstract class AbstractApiTest {
 
     @AfterEach
     void cleanDatabase() {
-        jdbcTemplate.update("DELETE FROM reservation");
-        jdbcTemplate.update("DELETE FROM court");
-        jdbcTemplate.update("DELETE FROM app_user");
-        jdbcTemplate.update("DELETE FROM surface_type");
+        DatabaseCleaner.clean(jdbcTemplate);
     }
 }

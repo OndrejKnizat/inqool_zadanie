@@ -52,8 +52,9 @@ public class CourtServiceImpl implements CourtService {
             throw duplicateNumber(request.courtNumber());
         }
         SurfaceType surfaceType = resolveSurfaceType(request.surfaceTypeId());
-        Court saved = courtDao.save(mapper.toEntity(request, surfaceType));
-        return mapper.toResponse(saved);
+        Court entity = mapper.toEntity(request, surfaceType);
+        return mapper.toResponse(UniqueKeys.saveOrConflict(() -> courtDao.save(entity),
+                duplicateNumber(request.courtNumber()).getMessage()));
     }
 
     @Override
@@ -67,7 +68,8 @@ public class CourtServiceImpl implements CourtService {
         }
         SurfaceType surfaceType = resolveSurfaceType(request.surfaceTypeId());
         mapper.updateEntity(entity, request, surfaceType);
-        return mapper.toResponse(courtDao.save(entity));
+        return mapper.toResponse(UniqueKeys.saveOrConflict(() -> courtDao.save(entity),
+                duplicateNumber(request.courtNumber()).getMessage()));
     }
 
     @Override

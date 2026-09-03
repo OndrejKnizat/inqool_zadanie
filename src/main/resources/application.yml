@@ -2,13 +2,18 @@ spring:
   application:
     name: tennis-club-reservations
   datasource:
-    url: jdbc:h2:mem:tennis;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:mem:tennis;DB_CLOSE_DELAY=-1;LOCK_TIMEOUT=5000
     username: sa
     password: ""
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+    properties:
+      # how long a transaction waits for the PESSIMISTIC_WRITE court lock taken when creating/updating a
+      # reservation (ms); a timeout is reported as HTTP 409. The H2 dialect does not render this hint into
+      # SQL, so H2 is configured through LOCK_TIMEOUT in the JDBC URL (same value) as well.
+      jakarta.persistence.lock.timeout: 5000
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
 
@@ -26,3 +31,6 @@ app:
       phone-number: "+420000000000"
       name: Administrator
       password: ${APP_ADMIN_PASSWORD:admin}
+  reservation:
+    min-duration: PT15M
+    max-duration: PT4H

@@ -2,6 +2,7 @@ package sk.knizat.tennisclub.service.impl;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -249,5 +250,16 @@ class CourtServiceImplTest {
 
         assertThatThrownBy(() -> service.delete(9L)).isInstanceOf(NotFoundException.class);
         verify(reservationDao, never()).existsUnfinishedByCourt(any(), any());
+    }
+
+    @Test
+    void should_throwConflict_when_uniqueIndexRejectsConcurrentDuplicateNumber() {
+        when(courtDao.existsByCourtNumber(5)).thenReturn(false);
+        when(surfaceTypeDao.findById(1L)).thenReturn(Optional.of(surface(1L, "Clay")));
+        when(courtDao.save(any(Court.class))).thenThrow(new DataIntegrityViolationException("ux_court_number_active"));
+
+        assertThatThrownBy(() -> service.create(new CourtRequest(5, null, 1L)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("Court with number 5 already exists");
     }
 }

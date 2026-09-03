@@ -2,6 +2,7 @@ package sk.knizat.tennisclub.service.impl;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -179,5 +180,15 @@ class SurfaceTypeServiceImplTest {
 
         assertThatThrownBy(() -> service.delete(9L)).isInstanceOf(NotFoundException.class);
         verify(dao, never()).countCourtsUsing(any());
+    }
+
+    @Test
+    void should_throwConflict_when_uniqueIndexRejectsConcurrentDuplicate() {
+        when(dao.findByName("Clay")).thenReturn(Optional.empty());
+        when(dao.save(any(SurfaceType.class))).thenThrow(new DataIntegrityViolationException("ux_surface_type_name_active"));
+
+        assertThatThrownBy(() -> service.create(new SurfaceTypeRequest("Clay", BigDecimal.ONE)))
+                .isInstanceOf(ConflictException.class)
+                .hasMessage("SurfaceType with name 'Clay' already exists");
     }
 }

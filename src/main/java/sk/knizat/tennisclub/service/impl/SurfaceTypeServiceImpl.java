@@ -45,8 +45,8 @@ public class SurfaceTypeServiceImpl implements SurfaceTypeService {
         if (surfaceTypeDao.findByName(name).isPresent()) {
             throw duplicateName(name);
         }
-        SurfaceType saved = surfaceTypeDao.save(mapper.toEntity(request));
-        return mapper.toResponse(saved);
+        SurfaceType entity = mapper.toEntity(request);
+        return mapper.toResponse(UniqueKeys.saveOrConflict(() -> surfaceTypeDao.save(entity), duplicateName(name).getMessage()));
     }
 
     @Override
@@ -60,7 +60,7 @@ public class SurfaceTypeServiceImpl implements SurfaceTypeService {
             throw duplicateName(name);
         }
         mapper.updateEntity(entity, request);
-        return mapper.toResponse(surfaceTypeDao.save(entity));
+        return mapper.toResponse(UniqueKeys.saveOrConflict(() -> surfaceTypeDao.save(entity), duplicateName(name).getMessage()));
     }
 
     @Override

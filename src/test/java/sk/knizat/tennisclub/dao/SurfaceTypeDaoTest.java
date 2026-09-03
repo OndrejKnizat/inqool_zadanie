@@ -1,6 +1,7 @@
 package sk.knizat.tennisclub.dao;
 
-import org.springframework.dao.IncorrectResultSizeDataAccessException;
+import jakarta.persistence.NonUniqueResultException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import sk.knizat.tennisclub.entity.Court;
@@ -203,12 +204,32 @@ class SurfaceTypeDaoTest extends AbstractDaoTest {
     }
 
     @Test
-    void should_throwNonUniqueResult_when_twoActiveRowsShareBusinessKey() {
-        fixtures.persistSurfaceType("Duplicate");
-        fixtures.persistSurfaceType("Duplicate");
-        fixtures.flushAndClear();
+    void should_rejectSecondActiveRow_when_nameAlreadyUsedByActiveRow() {
+        surfaceTypeDao.save(Fixtures.surfaceType("Duplicate", "1.00"));
 
-        assertThatThrownBy(() -> surfaceTypeDao.findByName("Duplicate"))
-                .isInstanceOf(IncorrectResultSizeDataAccessException.class);
+        assertThatThrownBy(() -> surfaceTypeDao.save(Fixtures.surfaceType("Duplicate", "2.00")))
+                .isInstanceOf(DataIntegrityViolationException.class);
+    }
+
+    @Test
+    void should_allowSameName_when_previousRowIsSoftDeleted() {
+        fixtures.persistDeleted(Fixtures.surfaceType("Reused", "1.00"));
+
+        SurfaceType again = surfaceTypeDao.save(Fixtures.surfaceType("Reused", "2.00"));
+
+        assertThat(again.getId()).isNotNull();
+        assertThat(surfaceTypeDao.findByName("Reused")).get().isEqualTo(again);
+    }
+
+    @Test
+    void should_throwNonUniqueResult_when_singleResultQueryMatchesSeveralRows() {
+        fixtures.persistSurfaceType("One");
+        fixtures.persistSurfaceType("Two");
+        AbstractDao<SurfaceType> dao = new AbstractDao<>(SurfaceType.class) {
+        };
+        dao.em = em;
+
+        assertThatThrownBy(() -> dao.singleResult(em.createQuery("SELECT s FROM SurfaceType s", SurfaceType.class)))
+                .isInstanceOf(NonUniqueResultException.class);
     }
 }

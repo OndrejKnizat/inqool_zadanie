@@ -31,3 +31,5 @@ All `app.*` properties can be overridden with environment variables.
 | `app.security.admin.phone-number` | `APP_SECURITY_ADMIN_PHONE_NUMBER` | `+420000000000` | admin login |
 | `app.security.admin.name` | `APP_SECURITY_ADMIN_NAME` | `Administrator` | admin display name |
 | `app.security.admin.password` | `APP_ADMIN_PASSWORD` | `admin` | admin password |
+| `app.reservation.min-duration` | `APP_RESERVATION_MIN_DURATION` | `PT15M` | shortest allowed reservation (ISO-8601 duration) |
+| `app.reservation.max-duration` | `APP_RESERVATION_MAX_DURATION` | `PT4H` | longest allowed reservation |

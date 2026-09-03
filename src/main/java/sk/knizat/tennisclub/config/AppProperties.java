@@ -14,12 +14,25 @@ import java.time.Duration;
  *
  * @param dataInit data initialization switch
  * @param security security related settings (JWT, bootstrap admin)
+ * @param reservation reservation interval bounds
  */
 @Validated
 @ConfigurationProperties("app")
 public record AppProperties(
         @NotNull @Valid DataInit dataInit,
-        @NotNull @Valid Security security) {
+        @NotNull @Valid Security security,
+        @NotNull @Valid Reservation reservation) {
+
+    /**
+     * Reservation interval bounds (ARCHITECTURE.md O-5).
+     *
+     * @param minDuration shortest allowed reservation, e.g. {@code PT15M}
+     * @param maxDuration longest allowed reservation, e.g. {@code PT4H}
+     */
+    public record Reservation(
+            @NotNull Duration minDuration,
+            @NotNull Duration maxDuration) {
+    }
 
     /**
      * Initial data switch: when enabled, default surface types and courts are created at startup.

@@ -20,7 +20,9 @@ class AppPropertiesTest {
             "app.security.admin.enabled=true",
             "app.security.admin.phone-number=+420000000000",
             "app.security.admin.name=Administrator",
-            "app.security.admin.password=admin"};
+            "app.security.admin.password=admin",
+            "app.reservation.min-duration=PT15M",
+            "app.reservation.max-duration=PT4H"};
 
     private final ApplicationContextRunner runner = new ApplicationContextRunner()
             .withUserConfiguration(PropertiesConfig.class);
@@ -37,6 +39,8 @@ class AppPropertiesTest {
             assertThat(props.security().admin().phoneNumber()).isEqualTo("+420000000000");
             assertThat(props.security().admin().name()).isEqualTo("Administrator");
             assertThat(props.security().admin().password()).isEqualTo("admin");
+            assertThat(props.reservation().minDuration()).isEqualTo(Duration.ofMinutes(15));
+            assertThat(props.reservation().maxDuration()).isEqualTo(Duration.ofHours(4));
         });
     }
 
@@ -54,6 +58,14 @@ class AppPropertiesTest {
                         "app.security.jwt.secret=0123456789012345678901234567890123",
                         "app.security.jwt.access-token-validity=PT15M",
                         "app.security.jwt.refresh-token-validity=P7D")
+                .run(ctx -> assertThat(ctx).hasFailed()
+                        .getFailure().hasRootCauseInstanceOf(BindValidationException.class));
+    }
+
+    @Test
+    void should_failStartup_when_reservationDurationIsMissing() {
+        runner.withPropertyValues(VALID)
+                .withPropertyValues("app.reservation.max-duration=")
                 .run(ctx -> assertThat(ctx).hasFailed()
                         .getFailure().hasRootCauseInstanceOf(BindValidationException.class));
     }
