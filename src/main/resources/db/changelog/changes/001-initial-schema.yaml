@@ -1,0 +1,257 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-1-create-surface_type
+      author: tennisclub
+      changes:
+        - createTable:
+            tableName: surface_type
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: price_per_minute
+                  type: decimal(10,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted_at
+                  type: timestamp with time zone
+
+  - changeSet:
+      id: 001-2-create-court
+      author: tennisclub
+      changes:
+        - createTable:
+            tableName: court
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: court_number
+                  type: int
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(100)
+              - column:
+                  name: surface_type_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted_at
+                  type: timestamp with time zone
+
+  - changeSet:
+      id: 001-3-create-app_user
+      author: tennisclub
+      changes:
+        - createTable:
+            tableName: app_user
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: phone_number
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(100)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: password_hash
+                  type: varchar(100)
+              - column:
+                  name: role
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted_at
+                  type: timestamp with time zone
+
+  - changeSet:
+      id: 001-4-create-reservation
+      author: tennisclub
+      changes:
+        - createTable:
+            tableName: reservation
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: court_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: user_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: start_time
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: end_time
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: game_type
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: price
+                  type: decimal(10,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamp with time zone
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted
+                  type: boolean
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deleted_at
+                  type: timestamp with time zone
+
+  - changeSet:
+      id: 001-5-foreign-keys
+      author: tennisclub
+      changes:
+        - addForeignKeyConstraint:
+            constraintName: fk_court_surface_type
+            baseTableName: court
+            baseColumnNames: surface_type_id
+            referencedTableName: surface_type
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            constraintName: fk_reservation_court
+            baseTableName: reservation
+            baseColumnNames: court_id
+            referencedTableName: court
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            constraintName: fk_reservation_user
+            baseTableName: reservation
+            baseColumnNames: user_id
+            referencedTableName: app_user
+            referencedColumnNames: id
+
+  - changeSet:
+      id: 001-6-indexes
+      author: tennisclub
+      changes:
+        - createIndex:
+            indexName: idx_reservation_court_time
+            tableName: reservation
+            columns:
+              - column:
+                  name: court_id
+              - column:
+                  name: start_time
+              - column:
+                  name: end_time
+        - createIndex:
+            indexName: idx_app_user_phone
+            tableName: app_user
+            columns:
+              - column:
+                  name: phone_number
+        - createIndex:
+            indexName: idx_court_number
+            tableName: court
+            columns:
+              - column:
+                  name: court_number

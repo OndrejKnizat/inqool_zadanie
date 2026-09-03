@@ -35,6 +35,10 @@ Java 21, Spring Boot 3.5.x, Maven (`./mvnw`), Hibernate 6 (cez `spring-boot-star
   Jediná výnimka: `EntityManager` v `AbstractDao` cez `@PersistenceContext protected EntityManager em;` (bez Spring Data
   v kontexte neexistuje bean `EntityManager`, `@PersistenceContext` ho dodá cez `PersistenceAnnotationBeanPostProcessor`).
 - Čas: `Instant` v API (ISO-8601) aj v entitách; „teraz“ vždy cez injektovaný `java.time.Clock` (bean v configu), nikdy `Instant.now()` v biznis kóde.
+- Audit časy (`createdAt`, `updatedAt`) plní `entity.AuditListener` z `Clock` beanu; `BaseEntity` na ne nemá settery.
+  Soft delete iba cez `markDeleted(clock.instant())`. H2 ukladá časy s mikrosekundovou presnosťou, preto v testoch
+  používaj `Clock.fixed(...)` s celými sekundami a neporovnávaj `Instant.now()` na rovnosť.
+- Entita `User` koliduje menom so Spring Security `User`; adaptér pre security pomenuj `AppUserDetails`, entitu nepremenúvaj.
 - Peniaze: `BigDecimal`, scale 2, `HALF_UP`.
 - Telefónne číslo: pred validáciou aj uložením odstrániť medzery a pomlčky, potom regex `^\+?[0-9]{7,15}$`.
 - Konfigurácia: prefix `app.*` cez `@ConfigurationProperties` record `AppProperties` (viď ARCHITECTURE.md §6).
