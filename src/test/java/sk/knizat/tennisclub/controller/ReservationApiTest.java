@@ -48,7 +48,7 @@ class ReservationApiTest extends AbstractApiTest {
     }
 
     private Long createSurface(String name, String price) {
-        ResponseEntity<SurfaceTypeResponse> response = rest.postForEntity("/api/surface-types",
+        ResponseEntity<SurfaceTypeResponse> response = admin().postForEntity("/api/surface-types",
                 new SurfaceTypeRequest(name, new BigDecimal(price)), SurfaceTypeResponse.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return Objects.requireNonNull(response.getBody()).id();
@@ -56,7 +56,7 @@ class ReservationApiTest extends AbstractApiTest {
 
     private void createCourt(Integer number, String name, Long surfaceId) {
         ResponseEntity<CourtResponse> response =
-                rest.postForEntity("/api/courts", new CourtRequest(number, name, surfaceId), CourtResponse.class);
+                admin().postForEntity("/api/courts", new CourtRequest(number, name, surfaceId), CourtResponse.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     }
 
@@ -66,7 +66,7 @@ class ReservationApiTest extends AbstractApiTest {
     }
 
     private ResponseEntity<ReservationResponse> create(CreateReservationRequest request) {
-        return rest.postForEntity(BASE, request, ReservationResponse.class);
+        return admin().postForEntity(BASE, request, ReservationResponse.class);
     }
 
     private ReservationResponse created(CreateReservationRequest request) {
@@ -76,16 +76,16 @@ class ReservationApiTest extends AbstractApiTest {
     }
 
     private ResponseEntity<ProblemDetail> createProblem(CreateReservationRequest request) {
-        return rest.postForEntity(BASE, request, ProblemDetail.class);
+        return admin().postForEntity(BASE, request, ProblemDetail.class);
     }
 
     private ResponseEntity<ReservationResponse> update(Long id, UpdateReservationRequest request) {
-        return rest.exchange(BASE + "/" + id, HttpMethod.PUT, new HttpEntity<>(request), ReservationResponse.class);
+        return admin().exchange(BASE + "/" + id, HttpMethod.PUT, new HttpEntity<>(request), ReservationResponse.class);
     }
 
     /** Lists with a raw, already encoded query string (a {@code URI} is not re-encoded by the template). */
     private ReservationResponse[] list(String query) {
-        return rest.getForObject(URI.create(BASE + query), ReservationResponse[].class);
+        return admin().getForObject(URI.create(BASE + query), ReservationResponse[].class);
     }
 
     /** Percent-encodes a query value; a literal {@code +} in a query string would arrive as a space. */
@@ -114,7 +114,7 @@ class ReservationApiTest extends AbstractApiTest {
         assertThat(response.getHeaders().getLocation().getPath()).isEqualTo(BASE + "/" + body.id());
 
         ResponseEntity<ReservationResponse> fetched =
-                rest.getForEntity(response.getHeaders().getLocation(), ReservationResponse.class);
+                admin().getForEntity(response.getHeaders().getLocation(), ReservationResponse.class);
         assertThat(fetched.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(fetched.getBody()).isEqualTo(body);
     }
@@ -217,8 +217,11 @@ class ReservationApiTest extends AbstractApiTest {
 
         assertThat(second.customer().phoneNumber()).isEqualTo(PHONE);
         assertThat(second.customer().name()).isEqualTo("Jane Original");
-        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM app_user", Integer.class)).isEqualTo(1);
-        assertThat(jdbcTemplate.queryForObject("SELECT phone_number FROM app_user", String.class)).isEqualTo(PHONE);
+        // customers are the accounts without a password (the ADMIN/USER login accounts have one)
+        assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM app_user WHERE password_hash IS NULL",
+                Integer.class)).isEqualTo(1);
+        assertThat(jdbcTemplate.queryForObject("SELECT phone_number FROM app_user WHERE password_hash IS NULL",
+                String.class)).isEqualTo(PHONE);
         assertThat(list("?phoneNumber=" + enc(PHONE_SPACED))).hasSize(2);
     }
 
@@ -250,7 +253,7 @@ class ReservationApiTest extends AbstractApiTest {
         ReservationResponse movable =
                 created(request(2, DAY1, Duration.ofHours(1), GameTypeDto.SINGLES, PHONE, "Jane"));
 
-        ResponseEntity<ProblemDetail> conflict = rest.exchange(BASE + "/" + movable.id(), HttpMethod.PUT,
+        ResponseEntity<ProblemDetail> conflict = admin().exchange(BASE + "/" + movable.id(), HttpMethod.PUT,
                 new HttpEntity<>(new UpdateReservationRequest(1, DAY1, DAY1.plus(Duration.ofHours(1)),
                         GameTypeDto.SINGLES)), ProblemDetail.class);
 
@@ -273,13 +276,13 @@ class ReservationApiTest extends AbstractApiTest {
 
     @Test
     void should_return404_when_putOrDeleteMissing() {
-        ResponseEntity<ProblemDetail> put = rest.exchange(BASE + "/999999", HttpMethod.PUT,
+        ResponseEntity<ProblemDetail> put = admin().exchange(BASE + "/999999", HttpMethod.PUT,
                 new HttpEntity<>(new UpdateReservationRequest(1, DAY1, DAY1.plus(Duration.ofHours(1)),
                         GameTypeDto.SINGLES)), ProblemDetail.class);
         assertThat(put.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
 
         ResponseEntity<ProblemDetail> delete =
-                rest.exchange(BASE + "/999999", HttpMethod.DELETE, null, ProblemDetail.class);
+                admin().exchange(BASE + "/999999", HttpMethod.DELETE, null, ProblemDetail.class);
         assertThat(delete.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(Objects.requireNonNull(delete.getBody()).getDetail())
                 .isEqualTo("Reservation with id 999999 not found");
@@ -291,10 +294,10 @@ class ReservationApiTest extends AbstractApiTest {
                 created(request(1, DAY1, Duration.ofHours(1), GameTypeDto.SINGLES, PHONE, "Jane"));
 
         ResponseEntity<Void> deleted =
-                rest.exchange(BASE + "/" + reservation.id(), HttpMethod.DELETE, null, Void.class);
+                admin().exchange(BASE + "/" + reservation.id(), HttpMethod.DELETE, null, Void.class);
         assertThat(deleted.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-        ResponseEntity<ProblemDetail> gone = rest.getForEntity(BASE + "/" + reservation.id(), ProblemDetail.class);
+        ResponseEntity<ProblemDetail> gone = admin().getForEntity(BASE + "/" + reservation.id(), ProblemDetail.class);
         assertThat(gone.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(list("")).isEmpty();
         // soft delete: the row is still there and its slot is free again

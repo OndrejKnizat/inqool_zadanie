@@ -36,13 +36,13 @@ class CourtApiTest extends AbstractApiTest {
 
     private Long createSurface(String name) {
         ResponseEntity<SurfaceTypeResponse> response =
-                rest.postForEntity(SURFACES, new SurfaceTypeRequest(name, new BigDecimal("2.00")), SurfaceTypeResponse.class);
+                admin().postForEntity(SURFACES, new SurfaceTypeRequest(name, new BigDecimal("2.00")), SurfaceTypeResponse.class);
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return Objects.requireNonNull(response.getBody()).id();
     }
 
     private ResponseEntity<CourtResponse> create(Integer number, String name, Long surfaceId) {
-        return rest.postForEntity(BASE, new CourtRequest(number, name, surfaceId), CourtResponse.class);
+        return admin().postForEntity(BASE, new CourtRequest(number, name, surfaceId), CourtResponse.class);
     }
 
     /** Inserts a user and a reservation on the court directly, ending at {@code end}. */
@@ -76,20 +76,20 @@ class CourtApiTest extends AbstractApiTest {
         assertThat(created.getHeaders().getLocation().getPath()).isEqualTo(BASE + "/" + body.id());
 
         ResponseEntity<CourtResponse> fetched =
-                rest.getForEntity(created.getHeaders().getLocation(), CourtResponse.class);
+                admin().getForEntity(created.getHeaders().getLocation(), CourtResponse.class);
         assertThat(fetched.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(fetched.getBody()).isEqualTo(body);
 
-        CourtResponse[] list = rest.getForObject(BASE, CourtResponse[].class);
+        CourtResponse[] list = admin().getForObject(BASE, CourtResponse[].class);
         assertThat(Arrays.stream(list).map(CourtResponse::id)).containsExactly(body.id());
         assertThat(list[0].surfaceType().name()).isEqualTo("Clay lifecycle");
 
-        ResponseEntity<CourtResponse> sameNumber = rest.exchange(BASE + "/" + body.id(), HttpMethod.PUT,
+        ResponseEntity<CourtResponse> sameNumber = admin().exchange(BASE + "/" + body.id(), HttpMethod.PUT,
                 new HttpEntity<>(new CourtRequest(1, "Centre court", clay)), CourtResponse.class);
         assertThat(sameNumber.getStatusCode()).as("update keeping own number").isEqualTo(HttpStatus.OK);
 
         clock.advance(Duration.ofHours(1));
-        ResponseEntity<CourtResponse> updated = rest.exchange(BASE + "/" + body.id(), HttpMethod.PUT,
+        ResponseEntity<CourtResponse> updated = admin().exchange(BASE + "/" + body.id(), HttpMethod.PUT,
                 new HttpEntity<>(new CourtRequest(2, "   ", grass)), CourtResponse.class);
         assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
         CourtResponse updatedBody = Objects.requireNonNull(updated.getBody());
@@ -99,16 +99,16 @@ class CourtApiTest extends AbstractApiTest {
         assertThat(updatedBody.createdAt()).isEqualTo(MutableClock.DEFAULT_NOW);
         assertThat(updatedBody.updatedAt()).isEqualTo(MutableClock.DEFAULT_NOW.plus(Duration.ofHours(1)));
 
-        ResponseEntity<Void> deleted = rest.exchange(BASE + "/" + body.id(), HttpMethod.DELETE, null, Void.class);
+        ResponseEntity<Void> deleted = admin().exchange(BASE + "/" + body.id(), HttpMethod.DELETE, null, Void.class);
         assertThat(deleted.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-        ResponseEntity<ProblemDetail> gone = rest.getForEntity(BASE + "/" + body.id(), ProblemDetail.class);
+        ResponseEntity<ProblemDetail> gone = admin().getForEntity(BASE + "/" + body.id(), ProblemDetail.class);
         assertThat(gone.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(gone.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(Objects.requireNonNull(gone.getBody()).getDetail())
                 .isEqualTo("Court with id " + body.id() + " not found");
 
-        CourtResponse[] afterDelete = rest.getForObject(BASE, CourtResponse[].class);
+        CourtResponse[] afterDelete = admin().getForObject(BASE, CourtResponse[].class);
         assertThat(Arrays.stream(afterDelete).map(CourtResponse::id)).doesNotContain(body.id());
     }
 
@@ -118,7 +118,7 @@ class CourtApiTest extends AbstractApiTest {
         assertThat(create(5, null, clay).getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<ProblemDetail> duplicate =
-                rest.postForEntity(BASE, new CourtRequest(5, "Other", clay), ProblemDetail.class);
+                admin().postForEntity(BASE, new CourtRequest(5, "Other", clay), ProblemDetail.class);
 
         assertThat(duplicate.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(duplicate.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
@@ -132,7 +132,7 @@ class CourtApiTest extends AbstractApiTest {
         assertThat(create(1, null, clay).getStatusCode()).isEqualTo(HttpStatus.CREATED);
         Long secondId = Objects.requireNonNull(create(2, null, clay).getBody()).id();
 
-        ResponseEntity<ProblemDetail> conflict = rest.exchange(BASE + "/" + secondId, HttpMethod.PUT,
+        ResponseEntity<ProblemDetail> conflict = admin().exchange(BASE + "/" + secondId, HttpMethod.PUT,
                 new HttpEntity<>(new CourtRequest(1, null, clay)), ProblemDetail.class);
 
         assertThat(conflict.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
@@ -144,7 +144,7 @@ class CourtApiTest extends AbstractApiTest {
     void should_allowReuseOfNumber_when_originalIsSoftDeleted() {
         Long clay = createSurface("Clay reuse");
         Long firstId = Objects.requireNonNull(create(3, null, clay).getBody()).id();
-        rest.delete(BASE + "/" + firstId);
+        admin().delete(BASE + "/" + firstId);
 
         ResponseEntity<CourtResponse> second = create(3, null, clay);
 
@@ -155,7 +155,7 @@ class CourtApiTest extends AbstractApiTest {
     @Test
     void should_return400_when_surfaceTypeDoesNotExist() {
         ResponseEntity<ProblemDetail> response =
-                rest.postForEntity(BASE, new CourtRequest(1, null, 999_999L), ProblemDetail.class);
+                admin().postForEntity(BASE, new CourtRequest(1, null, 999_999L), ProblemDetail.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
@@ -166,10 +166,10 @@ class CourtApiTest extends AbstractApiTest {
     @Test
     void should_return400_when_surfaceTypeIsSoftDeleted() {
         Long clay = createSurface("Clay deleted");
-        rest.delete(SURFACES + "/" + clay);
+        admin().delete(SURFACES + "/" + clay);
 
         ResponseEntity<ProblemDetail> response =
-                rest.postForEntity(BASE, new CourtRequest(1, null, clay), ProblemDetail.class);
+                admin().postForEntity(BASE, new CourtRequest(1, null, clay), ProblemDetail.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(Objects.requireNonNull(response.getBody()).getDetail())
@@ -179,7 +179,7 @@ class CourtApiTest extends AbstractApiTest {
     @Test
     void should_return400WithErrors_when_bodyInvalid() {
         ResponseEntity<ProblemDetail> response =
-                rest.postForEntity(BASE, new CourtRequest(0, null, null), ProblemDetail.class);
+                admin().postForEntity(BASE, new CourtRequest(0, null, null), ProblemDetail.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(Objects.requireNonNull(response.getBody()).getProperties()).containsKey("errors");
@@ -193,13 +193,13 @@ class CourtApiTest extends AbstractApiTest {
                 MutableClock.DEFAULT_NOW.plus(Duration.ofDays(1)).plus(Duration.ofHours(1)));
 
         ResponseEntity<ProblemDetail> blocked =
-                rest.exchange(BASE + "/" + courtId, HttpMethod.DELETE, null, ProblemDetail.class);
+                admin().exchange(BASE + "/" + courtId, HttpMethod.DELETE, null, ProblemDetail.class);
 
         assertThat(blocked.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(blocked.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(Objects.requireNonNull(blocked.getBody()).getDetail())
                 .isEqualTo("Court with id " + courtId + " has unfinished reservations and cannot be deleted");
-        assertThat(rest.getForEntity(BASE + "/" + courtId, CourtResponse.class).getStatusCode())
+        assertThat(admin().getForEntity(BASE + "/" + courtId, CourtResponse.class).getStatusCode())
                 .isEqualTo(HttpStatus.OK);
     }
 
@@ -210,7 +210,7 @@ class CourtApiTest extends AbstractApiTest {
         insertReservation(courtId, MutableClock.DEFAULT_NOW.minus(Duration.ofHours(2)),
                 MutableClock.DEFAULT_NOW.minus(Duration.ofHours(1)));
 
-        ResponseEntity<Void> deleted = rest.exchange(BASE + "/" + courtId, HttpMethod.DELETE, null, Void.class);
+        ResponseEntity<Void> deleted = admin().exchange(BASE + "/" + courtId, HttpMethod.DELETE, null, Void.class);
 
         assertThat(deleted.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     }

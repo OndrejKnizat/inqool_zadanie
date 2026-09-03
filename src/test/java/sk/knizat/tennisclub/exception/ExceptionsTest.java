@@ -15,5 +15,6 @@ class ExceptionsTest {
     void should_carryMessage_when_constructed() {
         assertThat(new ValidationException("bad")).hasMessage("bad").isInstanceOf(RuntimeException.class);
         assertThat(new ConflictException("clash")).hasMessage("clash").isInstanceOf(RuntimeException.class);
+        assertThat(new UnauthorizedException("denied")).hasMessage("denied").isInstanceOf(RuntimeException.class);
     }
 }

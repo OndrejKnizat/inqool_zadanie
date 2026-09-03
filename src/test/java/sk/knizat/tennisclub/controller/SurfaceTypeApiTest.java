@@ -30,7 +30,7 @@ class SurfaceTypeApiTest extends AbstractApiTest {
     }
 
     private ResponseEntity<SurfaceTypeResponse> create(String name, String price) {
-        return rest.postForEntity(BASE, new SurfaceTypeRequest(name, new BigDecimal(price)), SurfaceTypeResponse.class);
+        return admin().postForEntity(BASE, new SurfaceTypeRequest(name, new BigDecimal(price)), SurfaceTypeResponse.class);
     }
 
     @Test
@@ -48,15 +48,15 @@ class SurfaceTypeApiTest extends AbstractApiTest {
         assertThat(created.getHeaders().getLocation().getPath()).isEqualTo(BASE + "/" + body.id());
 
         ResponseEntity<SurfaceTypeResponse> fetched =
-                rest.getForEntity(created.getHeaders().getLocation(), SurfaceTypeResponse.class);
+                admin().getForEntity(created.getHeaders().getLocation(), SurfaceTypeResponse.class);
         assertThat(fetched.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(fetched.getBody()).isEqualTo(body);
 
-        SurfaceTypeResponse[] list = rest.getForObject(BASE, SurfaceTypeResponse[].class);
+        SurfaceTypeResponse[] list = admin().getForObject(BASE, SurfaceTypeResponse[].class);
         assertThat(Arrays.stream(list).map(SurfaceTypeResponse::id)).contains(body.id());
 
         clock.advance(Duration.ofHours(1));
-        ResponseEntity<SurfaceTypeResponse> updated = rest.exchange(BASE + "/" + body.id(), HttpMethod.PUT,
+        ResponseEntity<SurfaceTypeResponse> updated = admin().exchange(BASE + "/" + body.id(), HttpMethod.PUT,
                 new HttpEntity<>(new SurfaceTypeRequest(name + " v2", new BigDecimal("3"))),
                 SurfaceTypeResponse.class);
         assertThat(updated.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -66,16 +66,16 @@ class SurfaceTypeApiTest extends AbstractApiTest {
         assertThat(updatedBody.createdAt()).isEqualTo(MutableClock.DEFAULT_NOW);
         assertThat(updatedBody.updatedAt()).isEqualTo(MutableClock.DEFAULT_NOW.plus(Duration.ofHours(1)));
 
-        ResponseEntity<Void> deleted = rest.exchange(BASE + "/" + body.id(), HttpMethod.DELETE, null, Void.class);
+        ResponseEntity<Void> deleted = admin().exchange(BASE + "/" + body.id(), HttpMethod.DELETE, null, Void.class);
         assertThat(deleted.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
-        ResponseEntity<ProblemDetail> gone = rest.getForEntity(BASE + "/" + body.id(), ProblemDetail.class);
+        ResponseEntity<ProblemDetail> gone = admin().getForEntity(BASE + "/" + body.id(), ProblemDetail.class);
         assertThat(gone.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(gone.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
         assertThat(Objects.requireNonNull(gone.getBody()).getDetail())
                 .isEqualTo("SurfaceType with id " + body.id() + " not found");
 
-        SurfaceTypeResponse[] afterDelete = rest.getForObject(BASE, SurfaceTypeResponse[].class);
+        SurfaceTypeResponse[] afterDelete = admin().getForObject(BASE, SurfaceTypeResponse[].class);
         assertThat(Arrays.stream(afterDelete).map(SurfaceTypeResponse::id)).doesNotContain(body.id());
     }
 
@@ -85,7 +85,7 @@ class SurfaceTypeApiTest extends AbstractApiTest {
         assertThat(create(name, "1").getStatusCode()).isEqualTo(HttpStatus.CREATED);
 
         ResponseEntity<ProblemDetail> duplicate =
-                rest.postForEntity(BASE, new SurfaceTypeRequest(name, BigDecimal.ONE), ProblemDetail.class);
+                admin().postForEntity(BASE, new SurfaceTypeRequest(name, BigDecimal.ONE), ProblemDetail.class);
 
         assertThat(duplicate.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(duplicate.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON);
@@ -96,7 +96,7 @@ class SurfaceTypeApiTest extends AbstractApiTest {
     void should_allowReuseOfName_when_originalIsSoftDeleted(TestInfo info) {
         String name = unique(info);
         Long firstId = Objects.requireNonNull(create(name, "1").getBody()).id();
-        rest.delete(BASE + "/" + firstId);
+        admin().delete(BASE + "/" + firstId);
 
         ResponseEntity<SurfaceTypeResponse> second = create(name, "2");
 
@@ -107,7 +107,7 @@ class SurfaceTypeApiTest extends AbstractApiTest {
     @Test
     void should_return400WithErrors_when_bodyInvalid() {
         ResponseEntity<ProblemDetail> response =
-                rest.postForEntity(BASE, new SurfaceTypeRequest("", null), ProblemDetail.class);
+                admin().postForEntity(BASE, new SurfaceTypeRequest("", null), ProblemDetail.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(Objects.requireNonNull(response.getBody()).getProperties()).containsKey("errors");

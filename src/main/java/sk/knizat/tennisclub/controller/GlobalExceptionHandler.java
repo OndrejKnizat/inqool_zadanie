@@ -19,6 +19,7 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 import sk.knizat.tennisclub.exception.ConflictException;
 import sk.knizat.tennisclub.exception.NotFoundException;
+import sk.knizat.tennisclub.exception.UnauthorizedException;
 import sk.knizat.tennisclub.exception.ValidationException;
 
 import java.util.Map;
@@ -29,7 +30,9 @@ import java.util.TreeMap;
  * <p>
  * Extends {@link ResponseEntityExceptionHandler}, so every standard Spring MVC exception (405, 406, 415,
  * unknown path 404, ...) is a problem detail as well. Validation problems carry an extra {@code errors}
- * property (field or parameter name to message). 401/403 are produced by the security entry points (step 7).
+ * property (field or parameter name to message). 401/403 raised by the security filters are produced by the
+ * security entry point and access denied handler; {@link UnauthorizedException} covers the 401 raised inside
+ * the application (invalid refresh token).
  */
 @RestControllerAdvice
 @Slf4j
@@ -97,6 +100,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     @ExceptionHandler(NotFoundException.class)
     public ProblemDetail handleNotFound(NotFoundException ex) {
         return problem(HttpStatus.NOT_FOUND, "Not found", ex.getMessage());
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ProblemDetail handleUnauthorized(UnauthorizedException ex) {
+        return problem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
     }
 
     @ExceptionHandler(ConflictException.class)

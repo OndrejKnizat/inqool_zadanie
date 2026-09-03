@@ -9,5 +9,7 @@ app:
   security:
     jwt:
       secret: test-secret-test-secret-test-secret-test-secret-32b
+      # long enough for tests that move the controllable clock forward by hours; expiry is tested explicitly
+      access-token-validity: P1D
     admin:
       enabled: false

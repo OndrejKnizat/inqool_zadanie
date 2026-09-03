@@ -2,7 +2,6 @@ package sk.knizat.tennisclub.controller;
 
 import jakarta.validation.constraints.Min;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.MethodParameter;
@@ -12,7 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -23,7 +22,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.request.ServletWebRequest;
-import sk.knizat.tennisclub.config.SecurityConfig;
+import sk.knizat.tennisclub.exception.UnauthorizedException;
+import sk.knizat.tennisclub.support.AbstractWebMvcTest;
 
 import java.util.Map;
 
@@ -39,11 +39,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * registered only in this slice.
  */
 @WebMvcTest(controllers = GlobalExceptionHandlerTest.ProbeController.class)
-@Import({SecurityConfig.class, GlobalExceptionHandlerTest.ProbeController.class})
-class GlobalExceptionHandlerTest {
-
-    @Autowired
-    private MockMvc mockMvc;
+@Import(GlobalExceptionHandlerTest.ProbeController.class)
+@WithMockUser(roles = AbstractWebMvcTest.ROLE_USER)
+class GlobalExceptionHandlerTest extends AbstractWebMvcTest {
 
     @Test
     void should_return400WithErrors_when_pathVariableViolatesConstraint() throws Exception {
@@ -94,6 +92,15 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void should_return401Problem_when_unauthorizedExceptionThrown() throws Exception {
+        mockMvc.perform(get("/probe/unauthorized"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Unauthorized"))
+                .andExpect(jsonPath("$.detail").value("token rejected"));
+    }
+
+    @Test
     void should_useFallbackMessage_when_fieldErrorHasNoDefaultMessage() throws Exception {
         BeanPropertyBindingResult binding = new BeanPropertyBindingResult(new Object(), "request");
         binding.addError(new FieldError("request", "name", null));
@@ -132,6 +139,11 @@ class GlobalExceptionHandlerTest {
         @GetMapping("/probe/boom")
         String boom() {
             throw new IllegalStateException("boom");
+        }
+
+        @GetMapping("/probe/unauthorized")
+        String unauthorized() {
+            throw new UnauthorizedException("token rejected");
         }
 
         @PostMapping(value = "/probe", consumes = MediaType.APPLICATION_JSON_VALUE)

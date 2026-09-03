@@ -1,13 +1,14 @@
 package sk.knizat.tennisclub.controller;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.security.oauth2.jwt.BadJwtException;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import sk.knizat.tennisclub.config.SecurityConfig;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import sk.knizat.tennisclub.dto.court.CourtRequest;
 import sk.knizat.tennisclub.dto.court.CourtResponse;
 import sk.knizat.tennisclub.dto.surfacetype.SurfaceTypeResponse;
@@ -15,6 +16,7 @@ import sk.knizat.tennisclub.exception.ConflictException;
 import sk.knizat.tennisclub.exception.NotFoundException;
 import sk.knizat.tennisclub.exception.ValidationException;
 import sk.knizat.tennisclub.service.CourtService;
+import sk.knizat.tennisclub.support.AbstractWebMvcTest;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -24,6 +26,7 @@ import static org.hamcrest.Matchers.endsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -36,8 +39,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(CourtController.class)
-@Import(SecurityConfig.class)
-class CourtControllerTest {
+@WithMockUser(roles = AbstractWebMvcTest.ROLE_ADMIN)
+class CourtControllerTest extends AbstractWebMvcTest {
 
     private static final String BASE = "/api/courts";
     private static final Instant T = Instant.parse("2026-06-01T10:00:00Z");
@@ -46,13 +49,11 @@ class CourtControllerTest {
     private static final CourtResponse COURT_1 = new CourtResponse(1L, 1, "Centre court", CLAY, T, T);
     private static final String VALID_BODY = "{\"courtNumber\":1,\"name\":\"Centre court\",\"surfaceTypeId\":3}";
 
-    @Autowired
-    private MockMvc mockMvc;
-
     @MockitoBean
     private CourtService service;
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_returnListWithNestedSurface_when_getAll() throws Exception {
         when(service.findAll()).thenReturn(List.of(COURT_1));
 
@@ -71,6 +72,7 @@ class CourtControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_returnOne_when_getByIdExists() throws Exception {
         when(service.findById(1L)).thenReturn(COURT_1);
 
@@ -82,6 +84,7 @@ class CourtControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_return404Problem_when_getByIdMissing() throws Exception {
         when(service.findById(9L)).thenThrow(NotFoundException.of("Court", 9L));
 
@@ -94,6 +97,7 @@ class CourtControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_return400Problem_when_idIsNotANumber() throws Exception {
         mockMvc.perform(get(BASE + "/abc"))
                 .andExpect(status().isBadRequest())
@@ -245,5 +249,69 @@ class CourtControllerTest {
 
         mockMvc.perform(delete(BASE + "/9"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void should_return401Problem_when_noToken() throws Exception {
+        mockMvc.perform(delete(BASE + "/1"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Unauthorized"))
+                .andExpect(jsonPath("$.detail").value("Authentication is required"))
+                .andExpect(jsonPath("$.instance").value(BASE + "/1"));
+
+        verify(service, never()).delete(any());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void should_return401Problem_when_tokenRejectedByDecoder() throws Exception {
+        when(jwtDecoder.decode("bad")).thenThrow(new BadJwtException("expired"));
+
+        mockMvc.perform(get(BASE).header(HttpHeaders.AUTHORIZATION, "Bearer bad"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value("Invalid or expired token"));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void should_return401Problem_when_refreshTokenUsedAsAccessToken() throws Exception {
+        when(jwtDecoder.decode("refresh")).thenReturn(Jwt.withTokenValue("refresh")
+                .header("alg", "HS256").subject("+421900000001")
+                .claim("role", "ADMIN").claim("type", "refresh").build());
+
+        mockMvc.perform(get(BASE).header(HttpHeaders.AUTHORIZATION, "Bearer refresh"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.detail").value("Invalid or expired token"));
+    }
+
+    @Test
+    @WithAnonymousUser
+    void should_authenticateFromRoleClaim_when_accessTokenValid() throws Exception {
+        when(jwtDecoder.decode("access")).thenReturn(Jwt.withTokenValue("access")
+                .header("alg", "HS256").subject("+421900000001")
+                .claim("role", "ADMIN").claim("type", "access").build());
+
+        mockMvc.perform(delete(BASE + "/1").header(HttpHeaders.AUTHORIZATION, "Bearer access"))
+                .andExpect(status().isNoContent());
+
+        verify(service).delete(1L);
+    }
+
+    @Test
+    @WithMockUser(roles = ROLE_USER)
+    void should_return403Problem_when_userRoleOnAdminEndpoint() throws Exception {
+        mockMvc.perform(delete(BASE + "/1"))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.title").value("Forbidden"))
+                .andExpect(jsonPath("$.detail").value("Insufficient role for this operation"))
+                .andExpect(jsonPath("$.instance").value(BASE + "/1"));
+
+        verify(service, never()).delete(any());
     }
 }

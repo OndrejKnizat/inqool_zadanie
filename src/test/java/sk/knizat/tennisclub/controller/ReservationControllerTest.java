@@ -1,13 +1,11 @@
 package sk.knizat.tennisclub.controller;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import sk.knizat.tennisclub.config.SecurityConfig;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import sk.knizat.tennisclub.dto.GameTypeDto;
 import sk.knizat.tennisclub.dto.reservation.CreateReservationRequest;
 import sk.knizat.tennisclub.dto.reservation.CustomerResponse;
@@ -17,6 +15,7 @@ import sk.knizat.tennisclub.exception.ConflictException;
 import sk.knizat.tennisclub.exception.NotFoundException;
 import sk.knizat.tennisclub.exception.ValidationException;
 import sk.knizat.tennisclub.service.ReservationService;
+import sk.knizat.tennisclub.support.AbstractWebMvcTest;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -28,6 +27,7 @@ import static org.hamcrest.Matchers.startsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -40,8 +40,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(ReservationController.class)
-@Import(SecurityConfig.class)
-class ReservationControllerTest {
+@WithMockUser(roles = AbstractWebMvcTest.ROLE_ADMIN)
+class ReservationControllerTest extends AbstractWebMvcTest {
 
     private static final String BASE = "/api/reservations";
     private static final Instant T = Instant.parse("2026-06-01T10:00:00Z");
@@ -56,13 +56,11 @@ class ReservationControllerTest {
     private static final String VALID_UPDATE = "{\"courtNumber\":2,\"startTime\":\"2026-06-02T10:00:00Z\","
             + "\"endTime\":\"2026-06-02T11:30:00Z\",\"gameType\":\"DOUBLES\"}";
 
-    @Autowired
-    private MockMvc mockMvc;
-
     @MockitoBean
     private ReservationService service;
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_returnListWithNestedCustomer_when_getAllWithoutFilters() throws Exception {
         when(service.findAll(null, null, false)).thenReturn(List.of(RESERVATION));
 
@@ -84,6 +82,7 @@ class ReservationControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_forwardQueryParams_when_getAllWithFilters() throws Exception {
         when(service.findAll(1, PHONE, true)).thenReturn(List.of());
 
@@ -95,6 +94,7 @@ class ReservationControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_return400Problem_when_courtNumberFilterNotANumber() throws Exception {
         mockMvc.perform(get(BASE).param("courtNumber", "abc"))
                 .andExpect(status().isBadRequest())
@@ -103,6 +103,7 @@ class ReservationControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_return400Problem_when_phoneFilterMalformed() throws Exception {
         when(service.findAll(null, "abc", false)).thenThrow(new ValidationException("phoneNumber 'abc' is not valid"));
 
@@ -113,6 +114,7 @@ class ReservationControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_returnOne_when_getByIdExists() throws Exception {
         when(service.findById(1L)).thenReturn(RESERVATION);
 
@@ -123,6 +125,7 @@ class ReservationControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_return404Problem_when_getByIdMissing() throws Exception {
         when(service.findById(9L)).thenThrow(NotFoundException.of("Reservation", 9L));
 
@@ -284,5 +287,39 @@ class ReservationControllerTest {
 
         mockMvc.perform(delete(BASE + "/9"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void should_return401Problem_when_noToken() throws Exception {
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(VALID_CREATE))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Unauthorized"));
+
+        verify(service, never()).create(any());
+    }
+
+    @Test
+    @WithMockUser(roles = ROLE_USER)
+    void should_return201_when_userRoleCreatesReservation() throws Exception {
+        when(service.create(any())).thenReturn(RESERVATION);
+
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(VALID_CREATE))
+                .andExpect(status().isCreated());
+    }
+
+    @Test
+    @WithMockUser(roles = ROLE_USER)
+    void should_return403Problem_when_userRoleOnAdminEndpoint() throws Exception {
+        mockMvc.perform(put(BASE + "/1").contentType(MediaType.APPLICATION_JSON).content(VALID_UPDATE))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.title").value("Forbidden"));
+        mockMvc.perform(delete(BASE + "/1"))
+                .andExpect(status().isForbidden());
+
+        verify(service, never()).update(any(), any());
+        verify(service, never()).delete(any());
     }
 }

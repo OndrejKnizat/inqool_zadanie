@@ -1,19 +1,18 @@
 package sk.knizat.tennisclub.controller;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import sk.knizat.tennisclub.config.SecurityConfig;
+import org.springframework.security.test.context.support.WithAnonymousUser;
+import org.springframework.security.test.context.support.WithMockUser;
 import sk.knizat.tennisclub.dto.surfacetype.SurfaceTypeRequest;
 import sk.knizat.tennisclub.dto.surfacetype.SurfaceTypeResponse;
 import sk.knizat.tennisclub.exception.ConflictException;
 import sk.knizat.tennisclub.exception.NotFoundException;
 import sk.knizat.tennisclub.exception.ValidationException;
 import sk.knizat.tennisclub.service.SurfaceTypeService;
+import sk.knizat.tennisclub.support.AbstractWebMvcTest;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -23,6 +22,7 @@ import static org.hamcrest.Matchers.endsWith;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -35,8 +35,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(SurfaceTypeController.class)
-@Import(SecurityConfig.class)
-class SurfaceTypeControllerTest {
+@WithMockUser(roles = AbstractWebMvcTest.ROLE_ADMIN)
+class SurfaceTypeControllerTest extends AbstractWebMvcTest {
 
     private static final String BASE = "/api/surface-types";
     private static final Instant T = Instant.parse("2026-06-01T10:00:00Z");
@@ -44,13 +44,11 @@ class SurfaceTypeControllerTest {
             new SurfaceTypeResponse(1L, "Clay", new BigDecimal("2.50"), T, T);
     private static final String VALID_BODY = "{\"name\":\"Clay\",\"pricePerMinute\":2.5}";
 
-    @Autowired
-    private MockMvc mockMvc;
-
     @MockitoBean
     private SurfaceTypeService service;
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_returnList_when_getAll() throws Exception {
         when(service.findAll()).thenReturn(List.of(CLAY));
 
@@ -66,6 +64,7 @@ class SurfaceTypeControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_returnOne_when_getByIdExists() throws Exception {
         when(service.findById(1L)).thenReturn(CLAY);
 
@@ -76,6 +75,7 @@ class SurfaceTypeControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_return404Problem_when_getByIdMissing() throws Exception {
         when(service.findById(9L)).thenThrow(NotFoundException.of("SurfaceType", 9L));
 
@@ -88,6 +88,7 @@ class SurfaceTypeControllerTest {
     }
 
     @Test
+    @WithMockUser(roles = ROLE_USER)
     void should_return400Problem_when_idIsNotANumber() throws Exception {
         mockMvc.perform(get(BASE + "/abc"))
                 .andExpect(status().isBadRequest())
@@ -215,5 +216,28 @@ class SurfaceTypeControllerTest {
 
         mockMvc.perform(delete(BASE + "/9"))
                 .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @WithAnonymousUser
+    void should_return401Problem_when_noToken() throws Exception {
+        mockMvc.perform(get(BASE))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(401))
+                .andExpect(jsonPath("$.title").value("Unauthorized"))
+                .andExpect(jsonPath("$.detail").value("Authentication is required"));
+    }
+
+    @Test
+    @WithMockUser(roles = ROLE_USER)
+    void should_return403Problem_when_userRoleOnAdminEndpoint() throws Exception {
+        mockMvc.perform(post(BASE).contentType(MediaType.APPLICATION_JSON).content(VALID_BODY))
+                .andExpect(status().isForbidden())
+                .andExpect(content().contentType(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.title").value("Forbidden"));
+
+        verify(service, never()).create(any());
     }
 }
