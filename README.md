@@ -61,6 +61,35 @@ curl -s -X POST -H "Content-Type: application/json" \
 
 In Swagger UI use **Authorize**: `basicAuth` for the login operation, `bearerAuth` (paste the access token) for the rest.
 
+### User management (`/api/users`)
+
+| Method | Path | Role | Notes |
+|--------|------|------|-------|
+| `GET` | `/api/users` | ADMIN | all non-deleted users |
+| `GET` | `/api/users/me` | USER, ADMIN | the caller's own account (from the token subject) |
+| `GET` | `/api/users/{id}` | ADMIN | `404` when unknown or deleted |
+| `POST` | `/api/users` | ADMIN | `{phoneNumber, name, password, role}` → `201` + `Location`; `409` duplicate phone |
+| `PUT` | `/api/users/{id}` | ADMIN | `{name, role, password?}`; omitted `password` keeps the current one |
+| `DELETE` | `/api/users/{id}` | ADMIN | `204`; `409` for your own account, the last administrator, or a user with unfinished reservations |
+
+Passwords are 8 to 72 characters and are stored as BCrypt hashes; responses never contain the hash, only
+`canLogin`. Deleting a user is a soft delete: their past reservations stay readable and the phone number can be
+registered again. Access tokens already issued to a deleted user stay valid until they expire, but every lookup
+of that account (`/api/users/me`, login, refresh) then fails.
+The last administrator can be neither demoted nor deleted. Role changes and deletions affect already issued access
+tokens only when they expire: the resource server authorises from the token's `role` claim, so a demoted admin keeps
+admin rights until the next login or refresh (15 minutes by default).
+
+```bash
+# who am I
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/users/me
+
+# create an account that can log in (ADMIN)
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     -d '{"phoneNumber":"+421900000001","name":"Jane","password":"jane-secret","role":"USER"}' \
+     http://localhost:8080/api/users
+```
+
 ## Configuration
 
 All `app.*` properties can be overridden with environment variables.

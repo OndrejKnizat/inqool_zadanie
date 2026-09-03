@@ -68,4 +68,18 @@ class UserDaoTest extends AbstractDaoTest {
 
         assertThat(userDao.findByPhoneNumber("+421900000778")).get().isEqualTo(again);
     }
+
+    @Test
+    void should_countOnlyActiveAdmins_when_countActiveAdmins() {
+        User admin = Fixtures.user("+421900000801", "Admin");
+        admin.setRole(Role.ADMIN);
+        fixtures.persist(admin);
+        User deletedAdmin = Fixtures.user("+421900000802", "Gone");
+        deletedAdmin.setRole(Role.ADMIN);
+        fixtures.persistDeleted(deletedAdmin);
+        fixtures.persistUser("+421900000803");
+        fixtures.flushAndClear();
+
+        assertThat(userDao.countActiveAdmins()).isEqualTo(1);
+    }
 }

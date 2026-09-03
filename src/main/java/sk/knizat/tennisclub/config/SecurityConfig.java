@@ -28,8 +28,10 @@ import sk.knizat.tennisclub.security.RestAuthenticationEntryPoint;
  * <li>{@code POST /api/auth/login}: HTTP Basic against the user accounts (phone number + password), no other
  * authentication accepted.</li>
  * <li>Everything else: bearer JWT access tokens (resource server) with the role matrix
- * {@code permitAll} for auth, OpenAPI and the H2 console; {@code USER|ADMIN} for every {@code GET /api/**},
- * {@code POST /api/reservations} and {@code GET /api/users/me}; {@code ADMIN} for the rest of {@code /api/**}.</li>
+ * {@code permitAll} for auth, OpenAPI and the H2 console; {@code USER|ADMIN} for {@code GET /api/users/me},
+ * every other {@code GET}/{@code HEAD /api/**} and {@code POST /api/reservations}; {@code ADMIN} for the rest of
+ * {@code /api/**}, including every other method and path under {@code /api/users} (listing and reading other
+ * accounts is ADMIN-only, so the users rules come before the generic {@code GET /api/**} rule).</li>
  * </ol>
  * Failures are RFC 7807 problems: 401 from {@link RestAuthenticationEntryPoint}, 403 from
  * {@link RestAccessDeniedHandler}.
@@ -41,6 +43,8 @@ public class SecurityConfig {
     static final String LOGIN_PATH = "/api/auth/login";
     static final String[] PUBLIC_PATHS = {"/api/auth/**", "/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**"};
     static final String H2_CONSOLE_PATH = "/h2-console/**";
+    static final String USERS_ME_PATH = "/api/users/me";
+    static final String USERS_PATHS = "/api/users/**";
     static final String ROLE_USER = RoleDto.USER.name();
     static final String ROLE_ADMIN = RoleDto.ADMIN.name();
 
@@ -97,6 +101,9 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .requestMatchers(H2_CONSOLE_PATH)
                         .access((authentication, context) -> new AuthorizationDecision(h2ConsoleEnabled))
+                        .requestMatchers(HttpMethod.GET, USERS_ME_PATH).hasAnyRole(ROLE_USER, ROLE_ADMIN)
+                        .requestMatchers(HttpMethod.HEAD, USERS_ME_PATH).hasAnyRole(ROLE_USER, ROLE_ADMIN)
+                        .requestMatchers(USERS_PATHS).hasRole(ROLE_ADMIN)
                         .requestMatchers(HttpMethod.GET, "/api/**").hasAnyRole(ROLE_USER, ROLE_ADMIN)
                         .requestMatchers(HttpMethod.HEAD, "/api/**").hasAnyRole(ROLE_USER, ROLE_ADMIN)
                         .requestMatchers(HttpMethod.POST, "/api/reservations").hasAnyRole(ROLE_USER, ROLE_ADMIN)

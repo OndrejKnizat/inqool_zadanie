@@ -3,6 +3,7 @@ package sk.knizat.tennisclub.dao.impl;
 import org.springframework.stereotype.Repository;
 import sk.knizat.tennisclub.dao.AbstractDao;
 import sk.knizat.tennisclub.dao.UserDao;
+import sk.knizat.tennisclub.entity.Role;
 import sk.knizat.tennisclub.entity.User;
 
 import java.util.Optional;
@@ -20,5 +21,13 @@ public class UserDaoImpl extends AbstractDao<User> implements UserDao {
         return singleResult(em.createQuery(
                         "SELECT u FROM User u WHERE u.phoneNumber = :phoneNumber AND u.deleted = false", User.class)
                 .setParameter("phoneNumber", phoneNumber));
+    }
+
+    @Override
+    public long countActiveAdmins() {
+        return em.createQuery(
+                        "SELECT COUNT(u) FROM User u WHERE u.role = :role AND u.deleted = false", Long.class)
+                .setParameter("role", Role.ADMIN)
+                .getSingleResult();
     }
 }

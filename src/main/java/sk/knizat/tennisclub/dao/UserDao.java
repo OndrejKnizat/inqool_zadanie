@@ -9,4 +9,7 @@ public interface UserDao extends GenericDao<User> {
 
     /** Finds a non-deleted user by the (already normalised) phone number. */
     Optional<User> findByPhoneNumber(String phoneNumber);
+
+    /** Number of non-deleted users with the ADMIN role (guards against locking every administrator out). */
+    long countActiveAdmins();
 }

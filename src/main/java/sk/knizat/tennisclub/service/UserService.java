@@ -2,15 +2,16 @@ package sk.knizat.tennisclub.service;
 
 import sk.knizat.tennisclub.dto.RoleDto;
 import sk.knizat.tennisclub.dto.user.AuthUser;
+import sk.knizat.tennisclub.dto.user.CreateUserRequest;
+import sk.knizat.tennisclub.dto.user.UpdateUserRequest;
 import sk.knizat.tennisclub.dto.user.UserResponse;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
  * User accounts (customers and system users are the same entity, ARCHITECTURE.md O-1). Phone numbers are
  * normalised (spaces and hyphens removed) before every lookup or store.
- * <p>
- * Account management endpoints ({@code /api/users}) are added in step 8 on top of these operations.
  */
 public interface UserService {
 
@@ -41,4 +42,38 @@ public interface UserService {
      * @throws sk.knizat.tennisclub.exception.ValidationException when the phone number or password is invalid
      */
     UserResponse createAccount(String phoneNumber, String name, String rawPassword, RoleDto role);
+
+    /** All non-deleted users ordered by id. */
+    List<UserResponse> findAll();
+
+    /**
+     * Finds a non-deleted user by id.
+     *
+     * @throws sk.knizat.tennisclub.exception.NotFoundException when no such user exists
+     */
+    UserResponse findById(Long id);
+
+    /**
+     * Creates an account from the API payload; see {@link #createAccount(String, String, String, RoleDto)}.
+     */
+    UserResponse create(CreateUserRequest request);
+
+    /**
+     * Updates name and role of a user and, when a password is given, replaces the password hash.
+     *
+     * @throws sk.knizat.tennisclub.exception.NotFoundException when no such user exists
+     * @throws sk.knizat.tennisclub.exception.ValidationException when the given password is blank
+     */
+    UserResponse update(Long id, UpdateUserRequest request);
+
+    /**
+     * Soft-deletes a user. Past reservations stay as history.
+     *
+     * @param id               user to delete
+     * @param currentUserPhone phone number (principal name) of the caller, who cannot delete themselves
+     * @throws sk.knizat.tennisclub.exception.NotFoundException when no such user exists
+     * @throws sk.knizat.tennisclub.exception.ConflictException when the user is the caller or has unfinished
+     *                                                          reservations (ARCHITECTURE.md O-9)
+     */
+    void delete(Long id, String currentUserPhone);
 }
