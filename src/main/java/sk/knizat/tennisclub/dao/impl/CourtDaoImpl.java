@@ -6,6 +6,7 @@ import sk.knizat.tennisclub.dao.AbstractDao;
 import sk.knizat.tennisclub.dao.CourtDao;
 import sk.knizat.tennisclub.entity.Court;
 
+import java.util.List;
 import java.util.Optional;
 
 /** JPQL implementation of {@link CourtDao}. */
@@ -14,6 +15,15 @@ public class CourtDaoImpl extends AbstractDao<Court> implements CourtDao {
 
     public CourtDaoImpl() {
         super(Court.class);
+    }
+
+    /** {@inheritDoc} Overridden to {@code JOIN FETCH} the lazy surface type so mappers do not trigger N+1 selects. */
+    @Override
+    public List<Court> findAll() {
+        return em.createQuery(
+                        "SELECT c FROM Court c JOIN FETCH c.surfaceType WHERE c.deleted = false ORDER BY c.id",
+                        Court.class)
+                .getResultList();
     }
 
     @Override

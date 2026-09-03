@@ -1,25 +1,17 @@
 package sk.knizat.tennisclub.controller;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInfo;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.test.context.ActiveProfiles;
 import sk.knizat.tennisclub.dto.surfacetype.SurfaceTypeRequest;
 import sk.knizat.tennisclub.dto.surfacetype.SurfaceTypeResponse;
+import sk.knizat.tennisclub.support.AbstractApiTest;
 import sk.knizat.tennisclub.support.MutableClock;
-import sk.knizat.tennisclub.support.TestClockConfig;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -29,32 +21,9 @@ import java.util.Objects;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /** End-to-end test through the real stack (controller, service, DAO, H2). Names are unique per test. */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-@Import(TestClockConfig.class)
-class SurfaceTypeApiTest {
+class SurfaceTypeApiTest extends AbstractApiTest {
 
     private static final String BASE = "/api/surface-types";
-
-    @Autowired
-    private TestRestTemplate rest;
-
-    @Autowired
-    private MutableClock clock;
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @BeforeEach
-    void resetClock() {
-        clock.reset();
-    }
-
-    /** The e2e context commits real rows; remove them so later test classes sharing this context start clean. */
-    @AfterEach
-    void cleanDatabase() {
-        jdbcTemplate.update("DELETE FROM surface_type");
-    }
 
     private static String unique(TestInfo info) {
         return "Surface " + info.getTestMethod().orElseThrow().getName();

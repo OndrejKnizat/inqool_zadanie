@@ -1,11 +1,13 @@
 package sk.knizat.tennisclub.dao;
 
+import org.hibernate.Hibernate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import sk.knizat.tennisclub.entity.Court;
 import sk.knizat.tennisclub.entity.SurfaceType;
 import sk.knizat.tennisclub.support.Fixtures;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -101,5 +103,18 @@ class CourtDaoTest extends AbstractDaoTest {
         fixtures.flushAndClear();
 
         assertThat(courtDao.findAll()).extracting(Court::getId).containsExactly(saved.getId());
+    }
+
+    @Test
+    void should_fetchSurfaceTypeEagerly_when_findAll() {
+        fixtures.persistCourt(1);
+        fixtures.persistCourt(2);
+        fixtures.persistDeleted(Fixtures.court(3, fixtures.persistSurfaceType("Deleted court surface")));
+        fixtures.flushAndClear();
+
+        List<Court> courts = courtDao.findAll();
+
+        assertThat(courts).extracting(Court::getCourtNumber).containsExactly(1, 2);
+        assertThat(courts).allSatisfy(court -> assertThat(Hibernate.isInitialized(court.getSurfaceType())).isTrue());
     }
 }
