@@ -1,0 +1,12 @@
+spring:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+app:
+  data-init:
+    enabled: true
+  security:
+    jwt:
+      secret: ${APP_JWT_SECRET:dev-only-secret-dev-only-secret-dev-only-secret}

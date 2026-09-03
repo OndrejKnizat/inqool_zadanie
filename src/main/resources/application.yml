@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: tennis-club-reservations
+  datasource:
+    url: jdbc:h2:mem:tennis;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+
+app:
+  data-init:
+    enabled: false
+  security:
+    jwt:
+      # no fallback on purpose: production must provide APP_JWT_SECRET (dev/test profiles define their own)
+      secret: ${APP_JWT_SECRET}
+      access-token-validity: PT15M
+      refresh-token-validity: P7D
+    admin:
+      enabled: true
+      phone-number: "+420000000000"
+      name: Administrator
+      password: ${APP_ADMIN_PASSWORD:admin}

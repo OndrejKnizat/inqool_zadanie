@@ -1,0 +1,9 @@
+# Overrides for the "test" profile; everything else is inherited from application.yml.
+app:
+  data-init:
+    enabled: false
+  security:
+    jwt:
+      secret: test-secret-test-secret-test-secret-test-secret-32b
+    admin:
+      enabled: false

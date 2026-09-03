@@ -32,6 +32,8 @@ Java 21, Spring Boot 3.5.x, Maven (`./mvnw`), Hibernate 6 (cez `spring-boot-star
   (+ `service.impl`), `dao` (+ `dao.impl`), `entity`, `exception`, `security`. Štruktúra je v ARCHITECTURE.md §4.
 - DTO sú Java `record`y s Bean Validation anotáciami. Mapovanie entita↔DTO ručne v `mapper` (bez MapStruct).
 - Service aj DAO majú interface + impl. Konštruktorová injekcia (`@RequiredArgsConstructor`), žiadny `@Autowired` na poliach.
+  Jediná výnimka: `EntityManager` v `AbstractDao` cez `@PersistenceContext protected EntityManager em;` (bez Spring Data
+  v kontexte neexistuje bean `EntityManager`, `@PersistenceContext` ho dodá cez `PersistenceAnnotationBeanPostProcessor`).
 - Čas: `Instant` v API (ISO-8601) aj v entitách; „teraz“ vždy cez injektovaný `java.time.Clock` (bean v configu), nikdy `Instant.now()` v biznis kóde.
 - Peniaze: `BigDecimal`, scale 2, `HALF_UP`.
 - Telefónne číslo: pred validáciou aj uložením odstrániť medzery a pomlčky, potom regex `^\+?[0-9]{7,15}$`.
