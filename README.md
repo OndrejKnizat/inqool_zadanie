@@ -49,7 +49,8 @@ Lombok · springdoc-openapi (Swagger UI) · JUnit 5, Mockito, AssertJ, ArchUnit,
 
 ## Prerequisites
 
-- JDK 21 only (Maven is bundled via the wrapper `./mvnw`; on Windows use `mvnw.cmd`).
+- JDK 21 or newer (verified with 21 and 25; annotation processors are configured explicitly, as JDK 23+ no longer
+  picks them up from the classpath). Maven is bundled via the wrapper `./mvnw`; on Windows use `mvnw.cmd`.
 
 ## Build, test, run
 
