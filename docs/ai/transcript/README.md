@@ -12,4 +12,5 @@ sub-agent transcripts are inlined (collapsible) under the `Agent` call that star
 | 05 | 2026-09-03 18:12:29 | [Try again](05-try-again.md) | 106 | 2 |
 | 06 | 2026-09-03 19:05:53 | [Dobra praca, mozes spravit ostatok krokov bez mojeho OK. Pred tym ako budes pokr](06-dobra-praca-mozes-spravit-ostatok-krokov.md) | 415 | 6 |
 | 07 | 2026-09-04 12:48:59 | [Lokálny mvnw.cmd clean verify na čistom klone na Windows s JDK 25.0.2 zlyhal s 8](07-lok-lny-mvnw-cmd-clean-verify-na-istom-k.md) | 23 | 0 |
-| 08 | 2026-09-04 13:43:50 | [Ten curl walkthrough som odtestoval lokalne a vsetko funguje. Zadanie vyzaduje o](08-ten-curl-walkthrough-som-odtestoval-loka.md) | 67 | 0 |
+| 08 | 2026-09-04 13:43:50 | [Ten curl walkthrough som odtestoval lokalne a vsetko funguje. Zadanie vyzaduje o](08-ten-curl-walkthrough-som-odtestoval-loka.md) | 74 | 0 |
+| 09 | 2026-09-06 08:44:11 | [Diagramy su zle citatelne (Viacej sipok prechadza paralelne blizko seba a nevidi](09-diagramy-su-zle-citatelne-viacej-sipok-p.md) | 48 | 0 |

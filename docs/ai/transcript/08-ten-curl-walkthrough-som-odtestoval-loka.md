@@ -1,6 +1,6 @@
 # 08. Ten curl walkthrough som odtestoval lokalne a vsetko funguje. Zadanie vyzaduje o
 
-Session `session-ece6cbbd.jsonl`, started 2026-09-04T13:43:50.707Z. 67 records, 0 sub-agent transcript(s) inlined.
+Session `session-ece6cbbd.jsonl`, started 2026-09-04T13:43:50.707Z. 74 records, 0 sub-agent transcript(s) inlined.
 
 Legend: 🧑 user · 🤖 assistant · 🔧 tool call · ↳ tool result · 🧵 sub-agent.
 
@@ -743,3 +743,33 @@ docs/ai/transcript and describe the structure in docs/ai/README.md.
 Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>
 Claude-Session: https://claude.ai/code/session_01HG4QMjJL1R2wpPsJzvgL65" && git push -q -u origin claude/java-project-architecture-docs-mbchc0 && git log --oneline | head -1 && git status -sb | head -1
 ```
+
+**↳ Bash** 13:47:32
+
+<details><summary>tool result</summary>
+
+```
+wrote 9 files to /home/user/inqool_zadanie/docs/ai/transcript
+{"type":"queue-operation","operation":"enqueue","timestamp":"2026-09-03T13:48:07.006Z","sessionId":"ece6cbbd-2513-51fd-8b63-a1b27b35472a","content":"@\"/root/.claude/uploads/ece6cbbd-2513-51fd-8b63-a1
+first user message starts with: @"/root/.claude/uploads/ece6cbbd-2513-51fd-8b63-a1b27b35472a/d07baea1-New_Zad_n__projektu_
+records 1142 last ts 2026-09-04T13:47:25.532Z
+12M	docs/ai
+5b03547 Add AI development record: raw transcripts, readable export, converter
+## claude/java-project-architecture-docs-mbchc0...origin/claude/java-project-architecture-docs-mbchc0
+```
+
+</details>
+
+### 🤖 assistant — 13:47:57
+
+**Export histórie je hotový a pushnutý** (commit `5b03547` na vetve `claude/java-project-architecture-docs-mbchc0`).
+
+Čo je v `docs/ai/`:
+- **`raw/`**: doslovná kópia z `~/.claude/projects/`: hlavný transkript `session-ece6cbbd.jsonl` (1 142 záznamov) a 20 sub-agentov (`agent-<id>.jsonl` + `meta.json`). Overené, že prvá používateľská správa je tvoja prvá správa so zadaním a požiadavkami na architektúru.
+- **`export_transcript.py`**: Python konvertor (iba štandardná knižnica). Chronologicky vypíše všetky tvoje správy, moje správy, volania nástrojov so vstupom a ich výsledky. Sub-agentov vnorí ako rozbaľovacie sekcie priamo pod `Agent` volanie, ktoré ich spustilo (párovanie cez `toolUseId` z `meta.json`). Dlhé vstupy a výstupy skráti a pripíše poznámku s pôvodnou veľkosťou a odkazom na raw. Notifikácie harnessu doručené ako používateľské správy sú označené, nie sú považované za tvoje prompty.
+- **`transcript/`**: 8 markdown súborov, jeden na každý tvoj prompt, plus index `README.md` (čas, prompt, počet záznamov, počet sub-agentov).
+- **`README.md`**: popis nástroja, pracovného postupu, súborov daných agentom a štruktúry priečinka.
+
+Dve veci, ktoré máš vedieť:
+- Raw transkript logicky nemôže obsahovať úplný záver tohto posledného ťahu (kopírovanie, commit), pretože bol skopírovaný počas neho. README to uvádza. Ak chceš úplný záznam vrátane tohto ťahu, po skončení session spusti v mojom kontajneri znova kópiu a `python3 docs/ai/export_transcript.py` a commitni, alebo mi to napíš ako ďalší prompt (rovnaké obmedzenie sa potom posunie o jeden ťah).
+- Transkripty obsahujú tvoju e-mailovú adresu (dvakrát, v kontexte harnessu) a dev tokeny z lokálnych smoke testov. README uvádza, že ide len o vývojové údaje; e-mail som nemaskoval, aby raw ostal doslovný. Ak ho chceš odstrániť, povedz a upravím raw aj export.
