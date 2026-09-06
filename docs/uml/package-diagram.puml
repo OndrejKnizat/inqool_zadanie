@@ -1,47 +1,50 @@
 @startuml package-diagram
 !pragma layout smetana
-title Package and layer dependencies (enforced by ArchUnit)
+title Package dependencies (enforced by ArchUnit)
+skinparam linetype polyline
+skinparam nodesep 50
+skinparam ranksep 60
 skinparam packageStyle rectangle
 
-package "sk.knizat.tennisclub" {
-  [controller] as controller
-  [dto] as dto
-  [service] as service
-  [mapper] as mapper
-  [dao] as dao
-  [entity] as entity
-  [security] as security
-  [config] as config
-  [exception] as exception
-}
 cloud "HTTP client" as client
-database "H2 (Liquibase schema)" as db
+package "sk.knizat.tennisclub" {
+  [security]
+  [controller]
+  [service]
+  [dao]
+  [config]
+  [dto]
+  [mapper]
+  [entity]
+  [exception]
+}
+database "H2\n(Liquibase schema)" as db
 
-client --> security : Bearer JWT / Basic login
-security --> controller
-controller --> service
-controller --> dto
-service --> dao
-service --> mapper
-service --> dto
-mapper --> entity
-mapper --> dto
-dao --> entity
-dao --> db : EntityManager + JPQL
-security --> service : UserService
-config --> service : DataInitializer, AdminInitializer
-controller ..> exception
-service ..> exception
+' main vertical flow
+client -down-> security : Bearer JWT /\nBasic login
+security -down-> controller
+controller -down-> service
+service -down-> dao
+dao -down-> db : EntityManager\n+ JPQL
 
-note bottom of controller
-  never references entity or dao
-  (ArchUnit rule)
-end note
-note bottom of dao
-  only place with EntityManager;
-  every query filters deleted = false
-end note
-note right of service
-  only place with @Transactional
-end note
+' side dependencies
+security -right-> service : UserService
+config -right-> service : DataInitializer,\nAdminInitializer
+controller -right-> dto
+service -right-> mapper
+service -right-> dto
+mapper -down-> entity
+dao -right-> entity
+controller -left-> exception
+service -left-> exception
+
+' keep the side columns in place
+config -[hidden]down- exception
+dto -[hidden]down- mapper
+
+legend bottom
+  controller never references entity or dao (ArchUnit rule)
+  service is the only place with @Transactional
+  dao is the only place with EntityManager; every query filters deleted = false
+endlegend
 @enduml

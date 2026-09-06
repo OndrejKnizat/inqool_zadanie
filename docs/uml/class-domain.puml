@@ -1,0 +1,60 @@
+@startuml class-domain
+!pragma layout smetana
+title Domain model (JPA entities)
+skinparam classAttributeIconSize 0
+skinparam linetype polyline
+skinparam nodesep 40
+skinparam ranksep 50
+hide empty methods
+
+abstract class BaseEntity <<MappedSuperclass>> {
+  - id : Long
+  - createdAt : Instant
+  - updatedAt : Instant
+  - deleted : boolean
+  - deletedAt : Instant
+  + markDeleted(now : Instant)
+}
+class AuditListener <<EntityListener>> {
+  - clock : Clock
+  + onCreate(entity)
+  + onUpdate(entity)
+}
+class SurfaceType {
+  - name : String
+  - pricePerMinute : BigDecimal
+}
+class Court {
+  - courtNumber : Integer
+  - name : String
+}
+class User {
+  - phoneNumber : String
+  - name : String
+  - passwordHash : String
+}
+class Reservation {
+  - startTime : Instant
+  - endTime : Instant
+  - price : BigDecimal
+}
+enum Role {
+  USER
+  ADMIN
+}
+enum GameType {
+  SINGLES
+  DOUBLES
+}
+
+AuditListener -right-> BaseEntity : stamps createdAt / updatedAt
+BaseEntity <|-- SurfaceType
+BaseEntity <|-- Court
+BaseEntity <|-- Reservation
+BaseEntity <|-- User
+Court "*" -left-> "1" SurfaceType : surfaceType
+Reservation "*" -left-> "1" Court : court
+Reservation "*" -right-> "1" User : user
+Reservation -down-> GameType : gameType
+User -down-> Role : role
+@enduml

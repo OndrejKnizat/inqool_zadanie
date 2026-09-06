@@ -2,7 +2,8 @@
 
 | Diagram | Source | Rendered |
 |---------|--------|----------|
-| Class diagram (entities, DAO, service, controller, security) | [class-diagram.puml](class-diagram.puml) | [SVG](class-diagram.svg) · [PNG](class-diagram.png) |
+| Class diagram: domain model (JPA entities, enums, audit listener) | [class-domain.puml](class-domain.puml) | [SVG](class-domain.svg) · [PNG](class-domain.png) |
+| Class diagram: layers and dependencies (controller → service → dao, security, generic DAO) | [class-layers.puml](class-layers.puml) | [SVG](class-layers.svg) · [PNG](class-layers.png) |
 | Sequence diagram: create reservation (`POST /api/reservations`) | [sequence-create-reservation.puml](sequence-create-reservation.puml) | [SVG](sequence-create-reservation.svg) · [PNG](sequence-create-reservation.png) |
 | Package / layer diagram (dependencies enforced by ArchUnit) | [package-diagram.puml](package-diagram.puml) | [SVG](package-diagram.svg) · [PNG](package-diagram.png) |
 

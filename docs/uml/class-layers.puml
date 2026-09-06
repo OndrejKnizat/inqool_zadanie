@@ -1,0 +1,95 @@
+@startuml class-layers
+!pragma layout smetana
+title Layers and their dependencies (controller -> service -> dao)
+skinparam classAttributeIconSize 0
+skinparam linetype polyline
+skinparam nodesep 35
+skinparam ranksep 80
+skinparam class {
+  BackgroundColor<<controller>> #E3F2FD
+  BackgroundColor<<service>> #E8F5E9
+  BackgroundColor<<security>> #FFF3E0
+  BackgroundColor<<dao>> #F3E5F5
+}
+hide empty members
+hide stereotype
+
+class SurfaceTypeController <<controller>>
+class CourtController <<controller>>
+class ReservationController <<controller>>
+class UserController <<controller>>
+class AuthController <<controller>>
+
+interface SurfaceTypeService <<service>>
+interface CourtService <<service>>
+interface ReservationService <<service>>
+interface UserService <<service>>
+interface AuthService <<service>>
+class PriceCalculator <<service>>
+
+class AppUserDetailsService <<security>>
+class JwtTokenService <<security>>
+
+interface SurfaceTypeDao <<dao>>
+interface CourtDao <<dao>>
+interface ReservationDao <<dao>>
+interface UserDao <<dao>>
+interface GenericDao<T extends BaseEntity> <<dao>> {
+  + findById(id) : Optional<T>
+  + findAll() : List<T>
+  + save(entity) : T
+  + softDelete(entity, now)
+  + existsById(id) : boolean
+}
+abstract class AbstractDao<T> <<dao>> {
+  # em : EntityManager
+}
+
+' row 1 -> row 2
+SurfaceTypeController -down-> SurfaceTypeService
+CourtController -down-> CourtService
+ReservationController -down-> ReservationService
+UserController -down-> UserService
+AuthController -down-> AuthService
+
+' row 2 -> row 3 (main DAO straight down, neighbours diagonal)
+SurfaceTypeService -down-> SurfaceTypeDao
+CourtService -down-> CourtDao
+CourtService -down-> SurfaceTypeDao
+CourtService -down-> ReservationDao
+ReservationService -down-> ReservationDao
+ReservationService -down-> CourtDao
+ReservationService -down-> UserDao
+ReservationService -right-> PriceCalculator
+UserService -down-> UserDao
+UserService -down-> ReservationDao
+AuthService -left-> UserService
+AuthService -down-> JwtTokenService
+AppUserDetailsService -up-> UserService
+
+' generic DAO below the DAO row
+SurfaceTypeDao -down-|> GenericDao
+CourtDao -down-|> GenericDao
+ReservationDao -down-|> GenericDao
+UserDao -down-|> GenericDao
+AbstractDao -up.|> GenericDao
+
+' keep columns ordered
+SurfaceTypeController -[hidden]right- CourtController
+CourtController -[hidden]right- ReservationController
+ReservationController -[hidden]right- UserController
+UserController -[hidden]right- AuthController
+SurfaceTypeDao -[hidden]right- CourtDao
+CourtDao -[hidden]right- ReservationDao
+ReservationDao -[hidden]right- UserDao
+UserDao -[hidden]right- AppUserDetailsService
+AppUserDetailsService -[hidden]right- JwtTokenService
+
+legend right
+  |= colour |= layer |
+  |<#E3F2FD> | controller |
+  |<#E8F5E9> | service |
+  |<#FFF3E0> | security |
+  |<#F3E5F5> | dao |
+endlegend
+@enduml

@@ -8,7 +8,8 @@ and JWT-secured user management. Built with Spring Boot 3.5 and Hibernate 6 thro
 JPQL, **no Spring Data**), H2 in-memory database and Liquibase migrations.
 
 - Design specification: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) (data model, layers, endpoints, decisions)
-- UML: [class diagram](docs/uml/class-diagram.svg), [sequence diagram of creating a reservation](docs/uml/sequence-create-reservation.svg),
+- UML: [domain class diagram](docs/uml/class-domain.svg), [layer class diagram](docs/uml/class-layers.svg),
+  [sequence diagram of creating a reservation](docs/uml/sequence-create-reservation.svg),
   [package diagram](docs/uml/package-diagram.svg) (PlantUML sources in [docs/uml/](docs/uml/))
 - AI-assisted development: [docs/ai/README.md](docs/ai/README.md) (workflow, files given to the agent, chat history)
 
